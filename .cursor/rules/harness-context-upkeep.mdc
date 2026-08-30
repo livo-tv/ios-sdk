@@ -1,0 +1,25 @@
+---
+description: Keep AGENTS.md and harness platform docs current when durable facts change
+alwaysApply: true
+---
+
+# Harness context upkeep
+
+When your task changes any of the following, update context **in the same task** before claiming done:
+
+- Cross-service API / RPC / JWT / webhook / spawn contract
+- Wrangler bindings (services, D1, R2, KV) or env vars consumers need
+- Quality-gate scripts, coverage thresholds, deploy target
+- A durable gotcha future agents will rediscover the hard way
+
+## Where to write
+
+1. This repo's `AGENTS.md` → `## Learnings` (repo-specific).
+2. `harness/platform/` docs when the fact is cross-repo (contracts, infra, conventions).
+3. `harness/platform/decisions/` new ADR for durable contract or architecture choices.
+4. Run `node harness/scripts/audit.mjs` if wrangler/package scripts changed, then `sync.mjs` / `check.mjs` when practical.
+
+## Do not
+
+- Leave contract changes only in chat history
+- Edit managed `<!-- harness:begin managed -->` blocks by hand — change harness sources and re-sync

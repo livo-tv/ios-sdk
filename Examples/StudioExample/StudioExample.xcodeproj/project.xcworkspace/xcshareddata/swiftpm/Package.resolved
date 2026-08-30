@@ -1,0 +1,15 @@
+{
+  "originHash" : "121378da99466248ac0a0b1a9f50e6c86f7cdc120cbf4efc798aaf192097b1b2",
+  "pins" : [
+    {
+      "identity" : "realtimekit-ios-core",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/cloudflare/realtimekit-ios-core.git",
+      "state" : {
+        "revision" : "0edb1977b66906927a636785548a5158aebe0ef3",
+        "version" : "3.1.0"
+      }
+    }
+  ],
+  "version" : 3
+}

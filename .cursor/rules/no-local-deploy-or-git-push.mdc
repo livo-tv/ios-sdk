@@ -1,0 +1,31 @@
+---
+description: Never local-deploy Workers; local agents do not commit/push — cloud agents may
+alwaysApply: true
+---
+
+# No local deploy; git depends on agent environment
+
+**Deploy** is always owned by CI (Cloudflare Workers Builds / Modal). **Git** depends on where the agent runs.
+
+## All agents — do not deploy from the agent environment
+
+- Do not run `wrangler deploy`, `pnpm deploy`, `deploy:dev`, `deploy:prod`, `versions:upload`, `modal deploy`, or any other local deploy/publish
+- Do not work around deploy via `pnpm dlx wrangler@latest deploy` or Cloudflare write APIs that publish a Worker
+- Tell the user when a change needs a deploy; they ship via the existing pipeline
+
+## Local / desktop agents — do not commit or push
+
+When running in Cursor Desktop (or any local workspace session):
+
+- Do **not** `git commit`, `git push`, `git tag`, or create commits via other tools unless the user **explicitly** asks in that message
+- Do not amend, rebase onto remote, or force-push
+- Leave staging, committing, and pushing to the user
+
+## Cloud agents — commit and push are expected
+
+When running as a **cloud agent** (Background Agent, Cloud Agent, Bugbot fix agent, or similar remote VM checkout):
+
+- **Do** create conventional commits and push to the working branch so the work is reviewable and CI/Workers Builds can run
+- Prefer small, focused commits; follow that repo's commitlint / conventional-commit config
+- Still **never** local-deploy — push and let Workers Builds / release workflows ship
+- Avoid force-push to `main`/`master`; do not skip hooks unless the user explicitly requires it

@@ -1,0 +1,20 @@
+---
+description: Version bumps belong in the release GitHub Action pipeline, not in local edits
+alwaysApply: true
+---
+
+# Release version bumping
+
+Package/app versions are bumped by the **release GitHub Action** (semantic-release), not by hand in PRs or local commits.
+
+## Do
+
+- Ship changes with conventional commits; let CI release workflows bump `package.json` / changelogs / tags
+- Point users at the package's `.github/workflows/release.yml` (and related releaserc) when they ask how to release
+- Fix release pipeline config if versioning is wrong — do not workaround by editing the version field
+
+## Do not
+
+- Manually edit `version` in `package.json`, `wrangler.jsonc`, `pyproject.toml`, or other version fields to "cut a release"
+- Run `npm version` / `pnpm version` / equivalent locally as part of a feature or fix PR
+- Commit version bumps, changelog entries, or release tags that the release action is responsible for

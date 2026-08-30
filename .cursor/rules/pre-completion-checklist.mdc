@@ -1,0 +1,24 @@
+---
+description: Mandatory quality gates before marking work done in ios-sdk
+alwaysApply: true
+---
+
+# Pre-completion checklist (ios-sdk)
+
+**CRITICAL**: Do not mark work done until the gate is green.
+
+## Quality gate
+
+```bash
+./scripts/ci-check.sh
+```
+
+## Always
+
+1. Implement/update code.
+2. Run the **full** quality gate above (format/lint included — not just tests). Fix until green. Tests passing is not done; commit hooks reject ruff/prettier failures.
+3. Update `AGENTS.md` `## Learnings` / harness docs if you changed a durable fact or contract.
+4. Do **not** local-deploy. Local/desktop agents: do not commit/push unless the user asks. Cloud agents: commit and push with conventional commits.
+5. Background/cloud agents only: conventional commits per that repo's commitlint config.
+
+
