@@ -1,6 +1,6 @@
 {
 	"name": "@livo-tv/ios-sdk",
-	"version": "0.0.0-development",
+	"version": "1.0.0",
 	"private": true,
 	"description": "Livo native iOS studio SDK. Published as Swift Package Manager git tags — not npm.",
 	"scripts": {
