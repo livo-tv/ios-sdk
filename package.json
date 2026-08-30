@@ -2,7 +2,12 @@
 	"name": "@livo-tv/ios-sdk",
 	"version": "1.0.0",
 	"private": true,
-	"description": "Livo native iOS studio SDK. Published as Swift Package Manager git tags — not npm.",
+	"description": "Livo native iOS studio SDK. Public Swift package through SPM.",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/livo-tv/ios-sdk.git"
+	},
+	"license": "MIT",
 	"scripts": {
 		"prepare": "husky",
 		"release": "semantic-release"

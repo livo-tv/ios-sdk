@@ -1,51 +1,96 @@
-# ios-sdk
+# Livo iOS Studio SDK
 
-Native iOS studio for [Livo](https://livo.tv). Swift Package Manager products:
+Embed [Livo](https://livo.tv) Studio in a native iOS app. Same product as the web embed (`@livo-tv/sdk/studio`): host goes live, guests wait, chat, and join the stage.
 
-| Product | Role |
-| --- | --- |
-| `LivoStudioAPI` | Public media-svc client: host redeem, guest join, control tokens |
-| `LivoStudioKit` | SwiftUI room on [Cloudflare RealtimeKit Core](https://github.com/cloudflare/realtimekit-ios-core) |
+Distributed as a **Swift package**. Versions are git tags (`v1.2.3`). This repo is not published to npm.
 
-**Never put an org API key (`lk_…`) in the iOS binary.** Mint host/guest tokens on your backend with `@livo-tv/sdk/server` (or `POST /streams/:id/studio/host-session`), then hand the tokens to the app.
+| Product | Add this | Role |
+| --- | --- | --- |
+| `LivoStudioKit` | yes | SwiftUI room (host, guest, theme) |
+| `LivoStudioAPI` | pulled in by Kit | HTTP client for public studio endpoints |
+
+**Never put an org API key (`lk_…`) in the iOS binary.** Mint `hostToken` / `guestToken` on your backend, then hand those short-lived tokens to the app.
+
+## Requirements
+
+- iOS 17+
+- Xcode 16+ (Swift 5.9 tools)
+- Camera and microphone usage descriptions in the **host app** Info.plist
+- A Livo org API key on your **server** only
 
 ## Add the package
+
+### Xcode
+
+1. File → Add Package Dependencies…
+2. URL: `https://github.com/livo-tv/ios-sdk.git`
+3. Dependency rule: **Up to Next Major** from `1.0.0`
+4. Add product **LivoStudioKit** to your app target
+
+### `Package.swift`
 
 ```swift
 dependencies: [
     .package(url: "https://github.com/livo-tv/ios-sdk.git", from: "1.0.0"),
-]
+],
 ```
 
-Minimum iOS 17. Add `NSCameraUsageDescription` and `NSMicrophoneUsageDescription`.
+Then depend on `.product(name: "LivoStudioKit", package: "ios-sdk")`.
 
-## Partner host
+Pin a **version**, never `branch: "main"`. Prerelease tags (`1.2.3-rc.1`) are not selected by `from: "1.0.0"`.
+
+## Info.plist
+
+```xml
+<key>NSCameraUsageDescription</key>
+<string>Livo Studio uses the camera so you can appear on the broadcast.</string>
+<key>NSMicrophoneUsageDescription</key>
+<string>Livo Studio uses the microphone so guests can hear you.</string>
+```
+
+## Host
 
 ```swift
 import LivoStudioKit
 
 LivoHostStudioView(hostToken: mintedHostToken) { event in
-    // .joined / .live / .ended / .left
+    switch event {
+    case .joined, .live, .ended, .left:
+        break
+    }
 }
 .studioTheme(StudioTheme.livo)
 ```
 
-## Partner guest
+The host token is **single-use** and expires (typically 10 minutes). Redeem it when you present the view.
+
+## Guest
 
 ```swift
 LivoGuestStudioView(guestToken: mintedGuestToken)
+    .studioTheme(StudioTheme(primary: Color(red: 0.15, green: 0.39, blue: 0.92)))
 ```
 
-## First-party / already-minted session
+Guests enter a lobby (display name + device check) and join when the meeting is ready.
+
+## Theme
+
+`StudioTheme` matches the web embed object: `primary`, `background`, `foreground`, `radius`, `mode` (`.light` / `.dark` / `.system`). `StudioTheme.livo` is the default.
+
+## Point at another API host
+
+Production is `https://media-svc.livo.tv`. For Livo’s Dev account:
 
 ```swift
-StudioRoomView(session: session, apiURL: mediaURL)
+LivoHostStudioView(
+    hostToken: token,
+    apiURL: URL(string: "https://media-svc.livo-tv.workers.dev")!
+)
 ```
 
-`session` is the JSON from `POST /streams/:id/studio/session` (JWT) or
-`POST /public/studio/host/:token`.
+## Mint tokens on your backend
 
-## Backend (Node)
+Node / Workers with [`@livo-tv/sdk`](https://www.npmjs.com/package/@livo-tv/sdk):
 
 ```ts
 import { createLivoServerClient } from "@livo-tv/sdk/server";
@@ -57,18 +102,35 @@ const { hostToken, guestToken, hostUrl, guestUrl } = await livo.mintHostSession(
 );
 ```
 
-Send `hostToken` / `guestToken` to the iOS app. The `*Url` fields still open the web studio if you need a fallback.
+Or `POST /streams/:id/studio/host-session` with `X-Api-Key`. Send `hostToken` / `guestToken` to the iOS app. `hostUrl` / `guestUrl` still open the web studio if you need a fallback.
 
-## Versioning
+## Already have a session JSON
 
-Releases are cut by semantic-release on `main` (stable `vX.Y.Z`) and `dev` (prerelease `vX.Y.Z-rc.N`). SPM consumers pin a git tag — never a branch. See [docs/RELEASE_RUNBOOK.md](docs/RELEASE_RUNBOOK.md).
+First-party apps that called `POST /streams/:id/studio/session` (org JWT) can skip redeem:
 
-## Quality gate
-
-```bash
-./scripts/ci-check.sh
+```swift
+StudioRoomView(session: session, apiURL: mediaURL)
 ```
+
+`session` is the JSON from that route or from `POST /public/studio/host/:token`.
 
 ## Screen share
 
-Requires a ReplayKit Broadcast Upload Extension in the **host app**. See [docs/SCREEN_SHARE.md](docs/SCREEN_SHARE.md).
+The Screen share button is in the host toolbar. iOS will not capture the display until **your app** ships a ReplayKit Broadcast Upload Extension. The SDK cannot add that target. See [docs/SCREEN_SHARE.md](docs/SCREEN_SHARE.md).
+
+## Example
+
+[Examples/StudioExample](Examples/StudioExample) is a small SwiftUI app: paste a host or guest token and open the room. Open `Examples/StudioExample/StudioExample.xcodeproj` (it depends on this package via a local path).
+
+## Versioning
+
+| Branch | Tag | Meaning |
+| --- | --- | --- |
+| `main` | `vX.Y.Z` | stable |
+| `dev` | `vX.Y.Z-rc.N` | prerelease |
+
+Releases are cut by conventional commits + semantic-release. See [CHANGELOG.md](CHANGELOG.md).
+
+## License
+
+[MIT](LICENSE)

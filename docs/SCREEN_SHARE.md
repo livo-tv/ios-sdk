@@ -1,8 +1,9 @@
 # iOS screen share (ReplayKit)
 
-LivoStudioKit calls `meeting.localUser.enableScreenShare()` on RealtimeKit Core.
-iOS will not capture the screen until **the host application** ships a Broadcast
-Upload Extension. The SDK cannot add that target for you.
+Partner host apps that want the in-room **Screen share** button to capture the
+display must ship a ReplayKit Broadcast Upload Extension. LivoStudioKit only
+calls `meeting.localUser.enableScreenShare()` on RealtimeKit Core. The SDK
+cannot add the extension target for you.
 
 ## 1. Add a Broadcast Upload Extension
 
@@ -19,12 +20,12 @@ class SampleHandler: RtkSampleHandler {}
 ## 2. App Group
 
 1. Add the **App Groups** capability to the app target and the extension.
-2. Use the same identifier, for example `group.tv.livo.studio`.
+2. Use the same identifier, for example `group.your.bundle.studio`.
 3. Put this in **both** Info.plist files:
 
 ```xml
 <key>RTKRTCAppGroupIdentifier</key>
-<string>group.tv.livo.studio</string>
+<string>group.your.bundle.studio</string>
 ```
 
 And only in the **app** Info.plist:

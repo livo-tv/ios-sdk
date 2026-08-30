@@ -53,7 +53,7 @@ Includes the harness itself, `@livo-tv/blocks`, `@livo-tv/sdk`, and `ios-sdk`.
 
 # ios-sdk
 
-Swift Package Manager studio SDK (`LivoStudioAPI` + `LivoStudioKit`). Gate: `./scripts/ci-check.sh`. iOS 17+, Cloudflare RealtimeKit Core (`realtimekit-ios-core` from `3.1.0`). Publish is semantic-release git tags — never npm, never hand-bump `package.json` version.
+Public Swift Package Manager studio SDK (`LivoStudioAPI` + `LivoStudioKit`). Gate: `./scripts/ci-check.sh`. iOS 17+, Cloudflare RealtimeKit Core (`realtimekit-ios-core` from `3.1.0`). Publish is semantic-release git tags — never npm, never hand-bump `package.json` version. Third-party apps add `https://github.com/livo-tv/ios-sdk.git` from `1.0.0` (no token).
 
 Partner apps receive `hostToken` / `guestToken` from their backend (`POST /streams/:id/studio/host-session`). Never embed `lk_` API keys in the iOS binary. First-party `ios-app` injects `StudioRoomView(session:)` from `POST /streams/:id/studio/session`. Screen share requires a ReplayKit Broadcast Upload Extension in the host app (`docs/SCREEN_SHARE.md`).
 
@@ -69,7 +69,7 @@ Partner apps receive `hostToken` / `guestToken` from their backend (`POST /strea
 <!-- agents append durable, repo-specific facts here -->
 
 - `realtimekit-ios-core` is pinned by semver (`from: "3.1.0"`, revision `0edb197` = `v3.1.0`). Do not switch back to `branch: "main"` — a versioned SPM package cannot depend on a branch pin. Re-check the zip checksum upstream before bumping.
-- Conventional commits are enforced locally via husky + commitlint. Releases: semantic-release git tags (`vX.Y.Z` on `main`, `vX.Y.Z-rc.N` on `dev`). Never npm, never hand-bump `package.json` version. Bootstrap and day-2 ops: `docs/RELEASE_RUNBOOK.md`.
+- The GitHub repo is public. Partners pin `https://github.com/livo-tv/ios-sdk.git` from `1.0.0`. Keep the README partner-facing; no `lk_` keys, no first-party deploy secrets. Conventional commits + semantic-release git tags (`vX.Y.Z` on `main`, `vX.Y.Z-rc.N` on `dev`). Never npm, never hand-bump `package.json` version. Day-2 ops: `docs/RELEASE_RUNBOOK.md`.
 - Host-session tokens: prefer `hostToken` / `guestToken`. `StudioHostSession.resolvedHostToken` falls back to the last path segment of `hostUrl` for servers that have not deployed ADR 0021 yet.
 - Do not link RealtimeKit from `LivoStudioAPI` — that target must stay testable without the binary XCFramework.
 - RealtimeKit `getVideoView()` can allocate a new renderer, and RTK `onUpdate` fires every few seconds. Cache the first `UIView` per participant and never `removeFromSuperview` it on SwiftUI `updateUIView` or the local camera blinks.
