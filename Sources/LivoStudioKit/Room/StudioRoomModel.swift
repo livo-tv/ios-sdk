@@ -65,6 +65,7 @@ public final class StudioRoomModel: ObservableObject {
         case kick(StudioParticipant)
         case mute(StudioParticipant)
         case stopCamera(StudioParticipant)
+        case stopScreen(StudioParticipant)
         case takeOffStage(StudioParticipant)
 
         public var id: String {
@@ -72,9 +73,15 @@ public final class StudioRoomModel: ObservableObject {
             case let .kick(participant): "kick:\(participant.id)"
             case let .mute(participant): "mute:\(participant.id)"
             case let .stopCamera(participant): "camera:\(participant.id)"
+            case let .stopScreen(participant): "screen:\(participant.id)"
             case let .takeOffStage(participant): "stage:\(participant.id)"
             }
         }
+    }
+
+    public enum AdmitAs: String, Sendable {
+        case panelist
+        case audience
     }
 
     public let apiURL: URL
@@ -89,6 +96,9 @@ public final class StudioRoomModel: ObservableObject {
     private var primedWaitlist = false
     private var knownStageRequestIds = Set<String>()
     private var toastTasks: [UUID: Task<Void, Never>] = [:]
+    private var pendingPanelists = Set<String>()
+    private let defaults: UserDefaults
+    static let hostTileHintKey = "livo.studio.hostTileHintShown"
 
     public var isModerator: Bool { session.role == .moderator }
     public var canPublish: Bool { isModerator && streamStatus == "preview" }
@@ -118,11 +128,13 @@ public final class StudioRoomModel: ObservableObject {
         session: StudioSession,
         apiURL: URL = LivoAPIConfiguration.productionAPIURL,
         meeting: MeetingControlling? = nil,
+        defaults: UserDefaults = .standard,
         onEvent: ((StudioEvent) -> Void)? = nil
     ) {
         self.session = session
         self.apiURL = apiURL
         self.meeting = meeting ?? MeetingControllerFactory.makeDefault()
+        self.defaults = defaults
         self.onEvent = onEvent
         streamStatus = session.stream.status
         if let token = session.studioControlToken {
@@ -205,10 +217,8 @@ public final class StudioRoomModel: ObservableObject {
     public func toggleScreenShare() {
         if screenShareOn {
             meeting.disableScreenShare()
-            screenShareOn = false
         } else {
             meeting.enableScreenShare()
-            screenShareOn = true
         }
     }
 
@@ -231,7 +241,28 @@ public final class StudioRoomModel: ObservableObject {
     }
 
     public func admit(_ guest: StudioWaitlistedGuest) {
+        admit(guest, as: .panelist)
+    }
+
+    public func admit(_ guest: StudioWaitlistedGuest, as role: AdmitAs) {
+        if role == .panelist {
+            queuePanelist(guest)
+        }
         meeting.acceptWaitingRoom(id: guest.id)
+        if role == .panelist {
+            grantPendingIfPresent(matching: guest)
+        }
+    }
+
+    public func admitAll(as role: AdmitAs) {
+        let waiting = waitlist
+        if role == .panelist {
+            waiting.forEach(queuePanelist)
+        }
+        meeting.acceptAllWaitingRoom(ids: waiting.map(\.id))
+        if role == .panelist {
+            waiting.forEach(grantPendingIfPresent)
+        }
     }
 
     public func deny(_ guest: StudioWaitlistedGuest) {
@@ -316,7 +347,7 @@ public final class StudioRoomModel: ObservableObject {
     public func confirmMute() {
         if case let .mute(participant) = pendingConfirm {
             meeting.muteRemoteAudio(id: participant.id)
-            meeting.sendBroadcast(type: "host-media", payload: ["type": "host-media", "kind": "audio"])
+            sendHostMedia(kind: "audio", to: participant)
         }
         pendingConfirm = nil
     }
@@ -324,7 +355,14 @@ public final class StudioRoomModel: ObservableObject {
     public func confirmStopCamera() {
         if case let .stopCamera(participant) = pendingConfirm {
             meeting.disableRemoteVideo(id: participant.id)
-            meeting.sendBroadcast(type: "host-media", payload: ["type": "host-media", "kind": "video"])
+            sendHostMedia(kind: "video", to: participant)
+        }
+        pendingConfirm = nil
+    }
+
+    public func confirmStopScreen() {
+        if case let .stopScreen(participant) = pendingConfirm {
+            sendHostMedia(kind: "screen", to: participant)
         }
         pendingConfirm = nil
     }
@@ -385,6 +423,43 @@ public final class StudioRoomModel: ObservableObject {
     private func presentStatus(_ message: String) {
         statusMessage = message
         pushToast(message, kind: .warning)
+    }
+
+    private func sendHostMedia(kind: String, to participant: StudioParticipant) {
+        var payload = ["type": "host-media", "kind": kind]
+        if let userId = participant.userId, !userId.isEmpty {
+            payload["userId"] = userId
+        } else {
+            payload["userId"] = participant.id
+        }
+        meeting.sendBroadcast(type: "host-media", payload: payload)
+    }
+
+    private func queuePanelist(_ guest: StudioWaitlistedGuest) {
+        if let userId = guest.userId, !userId.isEmpty {
+            pendingPanelists.insert(userId)
+        }
+        pendingPanelists.insert(guest.id)
+    }
+
+    private func grantPendingIfPresent(matching guest: StudioWaitlistedGuest) {
+        let match = participants.first {
+            $0.id == guest.id || $0.userId == guest.id || $0.userId == guest.userId
+        }
+        if let match { takeAndGrant(match) }
+    }
+
+    private func takeAndGrant(_ participant: StudioParticipant) {
+        let keys = [participant.userId, participant.id].compactMap { $0 }.filter { !$0.isEmpty }
+        guard keys.contains(where: { pendingPanelists.contains($0) }) else { return }
+        keys.forEach { pendingPanelists.remove($0) }
+        meeting.grantStage(id: participant.userId ?? participant.id)
+    }
+
+    private func showHostTileHintIfNeeded() {
+        guard isModerator, !defaults.bool(forKey: Self.hostTileHintKey) else { return }
+        defaults.set(true, forKey: Self.hostTileHintKey)
+        pushToast("Tip: long-press a participant tile for host controls")
     }
 
     public func tearDown() {
@@ -463,6 +538,7 @@ extension StudioRoomModel: MeetingControllerDelegate {
         if phase != .inRoom {
             phase = .inRoom
             onEvent?(.joined(streamId: session.stream.id))
+            showHostTileHintIfNeeded()
         }
     }
 
@@ -494,6 +570,9 @@ extension StudioRoomModel: MeetingControllerDelegate {
     public func meetingDidUpdateParticipants(_ participants: [StudioParticipant]) {
         if self.participants != participants {
             self.participants = participants
+        }
+        if !pendingPanelists.isEmpty {
+            participants.forEach(takeAndGrant)
         }
     }
 
@@ -564,16 +643,33 @@ extension StudioRoomModel: MeetingControllerDelegate {
 
     public func meetingDidReceiveBroadcast(_ message: StudioBroadcastMessage) {
         switch message {
-        case let .hostMedia(kind):
+        case let .hostMedia(kind, targetUserId):
+            if let targetUserId, !isBroadcastForSelf(targetUserId) { return }
             switch kind {
-            case .audio: presentToast("The host muted you")
-            case .video: presentToast("The host stopped your camera")
-            case .screen: presentToast("The host stopped your screen share")
+            case .audio:
+                presentToast("The host muted you")
+            case .video:
+                presentToast("The host stopped your camera")
+            case .screen:
+                meeting.disableScreenShare()
+                presentToast("The host stopped your screen share")
             }
         }
     }
 
+    public func meetingDidFailScreenShare(reason: String) {
+        screenShareOn = false
+        let trimmed = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+        presentStatus(trimmed.isEmpty ? "Screen share could not start" : trimmed)
+    }
+
     public func meetingDidUpdateDevices() {
         refreshDevices()
+    }
+
+    private func isBroadcastForSelf(_ targetUserId: String) -> Bool {
+        targetUserId == selfUserId
+            || targetUserId == selfParticipant?.id
+            || targetUserId == selfParticipant?.userId
     }
 }

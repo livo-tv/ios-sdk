@@ -101,6 +101,12 @@ public final class RealtimeKitMeetingController: NSObject, MeetingControlling {
         meeting?.participants.rejectWaitingRoomRequest(id: id)
     }
 
+    public func acceptAllWaitingRoom(ids: [String]) {
+        for id in ids {
+            meeting?.participants.acceptWaitingRoomRequest(id: id)
+        }
+    }
+
     public func kick(id: String) {
         _ = remote(id)?.kick()
     }
@@ -240,7 +246,8 @@ public final class RealtimeKitMeetingController: NSObject, MeetingControlling {
         guard resolvedType == "host-media" else { return nil }
         let kind = (body["kind"] as? String).flatMap(StudioBroadcastMessage.HostMediaKind.init(rawValue:))
         guard let kind else { return nil }
-        return .hostMedia(kind: kind)
+        let target = (body["userId"] as? String) ?? (body["targetUserId"] as? String)
+        return .hostMedia(kind: kind, targetUserId: target)
     }
 
     fileprivate func publishParticipants() {
@@ -401,7 +408,12 @@ extension RealtimeKitMeetingController: @preconcurrency RtkSelfEventListener {
     public func onPermissionsUpdated(permission: SelfPermissions) {}
     public func onPinned() {}
     public func onUnpinned() {}
-    public func onScreenShareStartFailed(reason: String) {}
+    public func onScreenShareStartFailed(reason: String) {
+        Task { @MainActor in
+            self.publishMedia()
+            self.delegate?.meetingDidFailScreenShare(reason: reason)
+        }
+    }
     public func onUpdate(participant: RtkSelfParticipant) {
         Task { @MainActor in
             self.publishMedia()

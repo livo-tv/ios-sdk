@@ -25,6 +25,15 @@ struct StudioVideoViewTests {
         #expect(second.superview === container)
     }
 
+    @Test func attachAppliesContentMode() {
+        let container = VideoContainerView()
+        let video = UIView()
+        container.attach(video, contentMode: .scaleAspectFit)
+        #expect(video.contentMode == .scaleAspectFit)
+        container.attach(video, contentMode: .scaleAspectFill)
+        #expect(video.contentMode == .scaleAspectFill)
+    }
+
     @Test func attachNilClearsRenderer() {
         let container = VideoContainerView()
         let video = SuperviewProbe()

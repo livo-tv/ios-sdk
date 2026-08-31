@@ -59,6 +59,16 @@ struct StudioStageLayoutTests {
         #expect(!layout.strip.contains { $0.tileId == "a:screen" })
     }
 
+    @Test func gridColumnsMatchWebBreakpoints() {
+        #expect(StudioStageLayout.gridColumns(tileCount: 1, regularWidth: false) == 1)
+        #expect(StudioStageLayout.gridColumns(tileCount: 2, regularWidth: false) == 2)
+        #expect(StudioStageLayout.gridColumns(tileCount: 4, regularWidth: false) == 2)
+        #expect(StudioStageLayout.gridColumns(tileCount: 6, regularWidth: false) == 2)
+        #expect(StudioStageLayout.gridColumns(tileCount: 6, regularWidth: true) == 3)
+        #expect(StudioStageLayout.gridColumns(tileCount: 9, regularWidth: false) == 3)
+        #expect(StudioStageLayout.gridColumns(tileCount: 9, regularWidth: true) == 4)
+    }
+
     @Test func overflowKeepsSelf() {
         let people = (1 ... 10).map { person(id: "p\($0)") } + [person(id: "self", isSelf: true)]
         let layout = StudioStageLayout.arrange(tiles: StudioStageLayout.expand(people), max: 6)

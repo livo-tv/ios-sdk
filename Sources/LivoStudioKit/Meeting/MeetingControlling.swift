@@ -17,6 +17,7 @@ public protocol MeetingControlling: AnyObject {
     func disableScreenShare()
     func acceptWaitingRoom(id: String)
     func rejectWaitingRoom(id: String)
+    func acceptAllWaitingRoom(ids: [String])
     func kick(id: String)
     func pin(id: String)
     func unpin(id: String)
@@ -54,6 +55,7 @@ public protocol MeetingControllerDelegate: AnyObject {
     func meetingDidUpdateActiveSpeaker(id: String?)
     func meetingSelfStageDidChange(_ status: StudioStageStatus?)
     func meetingDidReceiveBroadcast(_ message: StudioBroadcastMessage)
+    func meetingDidFailScreenShare(reason: String)
     func meetingDidUpdateDevices()
 }
 
@@ -82,7 +84,7 @@ public struct StudioMediaDevice: Hashable, Identifiable, Sendable {
 }
 
 public enum StudioBroadcastMessage: Equatable, Sendable {
-    case hostMedia(kind: HostMediaKind)
+    case hostMedia(kind: HostMediaKind, targetUserId: String?)
 
     public enum HostMediaKind: String, Sendable {
         case audio

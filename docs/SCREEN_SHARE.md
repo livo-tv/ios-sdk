@@ -5,16 +5,26 @@ display must ship a ReplayKit Broadcast Upload Extension. LivoStudioKit only
 calls `meeting.localUser.enableScreenShare()` on RealtimeKit Core. The SDK
 cannot add the extension target for you.
 
+iOS always shows the **system** broadcast picker. There is no silent in-app
+capture. With the extension installed, the picker lists **Livo** instead of
+Zoom / Photos / etc.
+
+The first-party app (`ios-app`) already ships `LivoBroadcast`
+(`tv.livo.app.broadcast`) with App Group `group.tv.livo.app`.
+
 ## 1. Add a Broadcast Upload Extension
 
 In Xcode: File → New → Target → **Broadcast Upload Extension**.
 
-Use a handler that subclasses RealtimeKit's sample handler:
+RealtimeKit Core 3.1.0 does **not** export `RtkSampleHandler` from the
+XCFramework. Vendor the handler (see `ios-app/ios-livo/LivoBroadcast/`) or
+subclass if a later Core release exports it:
 
 ```swift
-import RealtimeKit
+import ReplayKit
 
-class SampleHandler: RtkSampleHandler {}
+@objc(SampleHandler)
+final class SampleHandler: RtkSampleHandler {}
 ```
 
 ## 2. App Group
@@ -37,7 +47,10 @@ And only in the **app** Info.plist:
 
 ## 3. Call the SDK
 
-`StudioToolbar` already exposes a Screen share button. It is a no-op until the
-extension is installed; RealtimeKit then presents the system broadcast picker.
+`StudioToolbar` exposes a Screen share button. Until the extension is
+installed the system picker has nothing from your app. After it is installed,
+RealtimeKit presents the picker and `screenShareOn` follows
+`onScreenShareUpdate`. A failed start (`onScreenShareStartFailed`) rolls the
+toggle back and toasts.
 
 See [RealtimeKit local participant — screen share (iOS)](https://developers.cloudflare.com/realtime/realtimekit/core/local-participant/).

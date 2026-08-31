@@ -100,12 +100,15 @@ struct LiveBadge: View {
 
 struct ParticipantGridView: View {
     @ObservedObject var model: StudioRoomModel
+    var regularWidth: Bool = false
     @Environment(\.studioTheme) private var theme
+
+    private var gap: CGFloat { regularWidth ? 12 : 8 }
 
     var body: some View {
         let layout = model.stageArrangement
         GeometryReader { geo in
-            VStack(spacing: 8) {
+            Group {
                 if layout.spotlight.isEmpty, layout.strip.isEmpty {
                     emptyStage
                 } else if !layout.spotlight.isEmpty {
@@ -114,7 +117,7 @@ struct ParticipantGridView: View {
                     grid(layout.strip, in: geo.size)
                 }
             }
-            .padding(8)
+            .padding(gap)
         }
     }
 
@@ -132,41 +135,71 @@ struct ParticipantGridView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    @ViewBuilder
     private func spotlightLayout(_ layout: StudioStageArrangement, in size: CGSize) -> some View {
-        VStack(spacing: 8) {
-            if let focus = layout.spotlight.first {
-                ParticipantTile(model: model, tile: focus)
-                    .frame(maxHeight: size.height * (layout.strip.isEmpty ? 1 : 0.68))
+        if regularWidth, !layout.strip.isEmpty || layout.overflow > 0 {
+            HStack(spacing: gap) {
+                if let focus = layout.spotlight.first {
+                    ParticipantTile(model: model, tile: focus)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                verticalStrip(layout)
+                    .frame(width: 256)
             }
-            if !layout.strip.isEmpty || layout.overflow > 0 {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(layout.strip) { tile in
-                            ParticipantTile(model: model, tile: tile)
-                                .frame(width: 120, height: 90)
-                        }
-                        if layout.overflow > 0 {
-                            overflowChip(layout.overflow)
+        } else {
+            VStack(spacing: gap) {
+                if let focus = layout.spotlight.first {
+                    ParticipantTile(model: model, tile: focus)
+                        .frame(maxHeight: size.height * (layout.strip.isEmpty ? 1 : 0.68))
+                }
+                if !layout.strip.isEmpty || layout.overflow > 0 {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: gap) {
+                            ForEach(layout.strip) { tile in
+                                ParticipantTile(model: model, tile: tile)
+                                    .aspectRatio(16 / 9, contentMode: .fit)
+                                    .frame(width: 160)
+                            }
+                            if layout.overflow > 0 {
+                                overflowChip(layout.overflow)
+                                    .frame(width: 160, height: 90)
+                            }
                         }
                     }
+                    .frame(height: 90)
                 }
-                .frame(height: 90)
             }
         }
     }
 
-    private func grid(_ tiles: [StudioDisplayTile], in size: CGSize) -> some View {
-        let columns = tiles.count > 1 ? 2 : 1
-        let rows = max(1, Int(ceil(Double(tiles.count) / Double(columns))))
-        let width = size.width / CGFloat(columns)
-        let height = size.height / CGFloat(rows)
-        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: columns), spacing: 8) {
+    private func verticalStrip(_ layout: StudioStageArrangement) -> some View {
+        ScrollView {
+            VStack(spacing: gap) {
+                ForEach(layout.strip) { tile in
+                    ParticipantTile(model: model, tile: tile)
+                        .aspectRatio(16 / 9, contentMode: .fit)
+                }
+                if layout.overflow > 0 {
+                    overflowChip(layout.overflow)
+                        .aspectRatio(16 / 9, contentMode: .fit)
+                }
+            }
+        }
+    }
+
+    private func grid(_ tiles: [StudioDisplayTile], in _: CGSize) -> some View {
+        let columns = StudioStageLayout.gridColumns(tileCount: tiles.count, regularWidth: regularWidth)
+        return LazyVGrid(
+            columns: Array(repeating: GridItem(.flexible(), spacing: gap), count: columns),
+            spacing: gap
+        ) {
             ForEach(tiles) { tile in
                 ParticipantTile(model: model, tile: tile)
-                    .frame(minWidth: width - 12, minHeight: max(120, height - 12))
+                    .aspectRatio(16 / 9, contentMode: .fit)
                     .id(tile.tileId)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 
     private func overflowChip(_ count: Int) -> some View {
@@ -175,7 +208,7 @@ struct ParticipantGridView: View {
         } label: {
             Text("+\(count)")
                 .font(.headline)
-                .frame(width: 120, height: 90)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(theme.foreground.opacity(0.08), in: RoundedRectangle(cornerRadius: theme.radius))
         }
         .accessibilityLabel("\(count) more participants")
@@ -191,30 +224,19 @@ struct ParticipantTile: View {
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            StudioVideoView(view: model.videoView(for: tile))
-            if tile.kind != .camera {
-                Color.black.opacity(tile.kind == .idle ? 0.35 : 0)
-                if tile.kind == .idle {
-                    Text(initials)
-                        .font(.title.weight(.semibold))
-                        .foregroundStyle(theme.foreground)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
+            Color.black
+            StudioVideoView(
+                view: model.videoView(for: tile),
+                contentMode: tile.kind == .screen ? .scaleAspectFit : .scaleAspectFill
+            )
+            if tile.kind == .idle {
+                Color.black.opacity(0.35)
+                Text(initials)
+                    .font(.title.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            HStack {
-                Text(tile.kind == .screen ? "\(participant.name) · screen" : participant.name)
-                    .font(.caption.weight(.medium))
-                if !participant.audioEnabled {
-                    Image(systemName: "mic.slash.fill")
-                }
-                if participant.pinned {
-                    Image(systemName: "pin.fill")
-                }
-                Spacer()
-            }
-            .padding(8)
-            .foregroundStyle(theme.foreground)
-            .background(.black.opacity(0.45))
+            nameBar
         }
         .overlay {
             if model.activeSpeakerId == participant.id, !participant.isSelf {
@@ -223,52 +245,69 @@ struct ParticipantTile: View {
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: theme.radius))
-        .contextMenu {
-            if model.isModerator, !participant.isSelf {
+        .contextMenu { hostMenu }
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityHint(model.isModerator && !participant.isSelf
+            ? "Long-press for host controls"
+            : "")
+    }
+
+    private var nameBar: some View {
+        HStack(spacing: 6) {
+            Text(tile.kind == .screen ? "\(participant.name) · screen" : participant.name)
+                .font(.caption.weight(.medium))
+                .lineLimit(1)
+            if !participant.audioEnabled {
+                Image(systemName: "mic.slash.fill")
+                    .font(.caption2)
+            }
+            if participant.pinned {
+                Image(systemName: "pin.fill")
+                    .font(.caption2)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .foregroundStyle(.white)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [.black.opacity(0.7), .clear],
+                startPoint: .bottom,
+                endPoint: .top
+            )
+        )
+    }
+
+    @ViewBuilder
+    private var hostMenu: some View {
+        if model.isModerator, !participant.isSelf {
+            if tile.kind == .screen {
+                Button("Stop screen share") { model.pendingConfirm = .stopScreen(participant) }
+            } else {
                 Button("Mute") { model.pendingConfirm = .mute(participant) }
                 Button("Stop camera") { model.pendingConfirm = .stopCamera(participant) }
-                Button(participant.pinned ? "Unpin" : "Pin") { model.togglePin(participant) }
-                if StudioStageLayout.isOnStage(participant.stageStatus) {
-                    Button("Take off stage") { model.pendingConfirm = .takeOffStage(participant) }
-                } else {
-                    Button("Bring on air") { model.bringOnAir(participant) }
-                }
-                Button("Kick", role: .destructive) { model.pendingConfirm = .kick(participant) }
             }
+            Button(participant.pinned ? "Unpin" : "Pin") { model.togglePin(participant) }
+            if StudioStageLayout.isOnStage(participant.stageStatus) {
+                Button("Take off stage") { model.pendingConfirm = .takeOffStage(participant) }
+            } else {
+                Button("Bring on air") { model.bringOnAir(participant) }
+            }
+            Button("Kick", role: .destructive) { model.pendingConfirm = .kick(participant) }
         }
-        .accessibilityLabel(participant.name)
+    }
+
+    private var accessibilityLabel: String {
+        var parts = [tile.kind == .screen ? "\(participant.name) screen" : participant.name]
+        if !participant.audioEnabled { parts.append("muted") }
+        if participant.pinned { parts.append("pinned") }
+        return parts.joined(separator: ", ")
     }
 
     private var initials: String {
         StudioChatGrouping.initials(participant.name)
-    }
-}
-
-struct WaitingRoomStrip: View {
-    @ObservedObject var model: StudioRoomModel
-    @Environment(\.studioTheme) private var theme
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Waiting room")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(theme.secondary)
-            ForEach(model.waitlist) { guest in
-                HStack {
-                    Text(guest.name)
-                    Spacer()
-                    Button("Admit") { model.admit(guest) }
-                        .buttonStyle(.borderedProminent)
-                        .tint(theme.primary)
-                        .controlSize(.small)
-                    Button("Deny", role: .destructive) { model.deny(guest) }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                }
-            }
-        }
-        .padding(12)
-        .background(theme.foreground.opacity(0.06))
     }
 }
 
@@ -341,10 +380,16 @@ struct StudioToolbar: View {
 
 struct StudioSidePanel: View {
     @ObservedObject var model: StudioRoomModel
+    var fillsHeight = false
     @Environment(\.studioTheme) private var theme
+    @State private var compactHeight: CGFloat = 280
+    @State private var dragStartHeight: CGFloat = 280
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            if !fillsHeight {
+                compactResizeHandle
+            }
             HStack(spacing: 8) {
                 tab("People", tab: .people, badge: model.peopleBadge)
                 tab("Chat", tab: .chat, badge: model.unreadChat)
@@ -357,9 +402,41 @@ struct StudioSidePanel: View {
                 StudioChatPanel(model: model)
             }
         }
-        .padding(12)
-        .frame(maxHeight: 240)
+        .padding(.horizontal, 12)
+        .padding(.top, fillsHeight ? 12 : 4)
+        .padding(.bottom, 12)
+        .frame(maxHeight: fillsHeight ? .infinity : compactHeight)
         .background(theme.foreground.opacity(0.05))
+    }
+
+    private var compactResizeHandle: some View {
+        Capsule()
+            .fill(theme.foreground.opacity(0.28))
+            .frame(width: 36, height: 5)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 4)
+                    .onChanged { value in
+                        compactHeight = min(520, max(180, dragStartHeight - value.translation.height))
+                    }
+                    .onEnded { _ in
+                        dragStartHeight = compactHeight
+                    }
+            )
+            .accessibilityLabel("Resize people and chat panel")
+            .accessibilityAdjustableAction { direction in
+                switch direction {
+                case .increment:
+                    compactHeight = min(520, compactHeight + 40)
+                case .decrement:
+                    compactHeight = max(180, compactHeight - 40)
+                @unknown default:
+                    break
+                }
+                dragStartHeight = compactHeight
+            }
     }
 
     private func tab(_ title: String, tab: StudioRoomModel.SideTab, badge: Int) -> some View {
@@ -392,12 +469,50 @@ struct StudioSidePanel: View {
     private var people: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
+                if model.isModerator, let guestUrl = model.session.guestUrl, let url = URL(string: guestUrl) {
+                    ShareLink(item: url) {
+                        Label("Share guest link", systemImage: "square.and.arrow.up")
+                    }
+                    .controlSize(.small)
+                }
+                if model.isModerator, !model.waitlist.isEmpty {
+                    waitingRoom
+                }
                 if !model.stageRequests.isEmpty {
                     stageRequests
                 }
                 section("On stage", rows: model.stageParticipants, audience: false)
                 if !model.audienceParticipants.isEmpty {
                     section("Audience", rows: model.audienceParticipants, audience: true)
+                }
+            }
+        }
+    }
+
+    private var waitingRoom: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Waiting room")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(theme.secondary)
+                Spacer()
+                Menu("Admit all") {
+                    Button("Admit all as panelists") { model.admitAll(as: .panelist) }
+                    Button("Admit all as audience") { model.admitAll(as: .audience) }
+                }
+                .controlSize(.small)
+            }
+            ForEach(model.waitlist) { guest in
+                HStack {
+                    Text(guest.name)
+                    Spacer()
+                    Menu("Admit") {
+                        Button("Admit as panelist") { model.admit(guest, as: .panelist) }
+                        Button("Admit as audience") { model.admit(guest, as: .audience) }
+                    }
+                    .controlSize(.small)
+                    Button("Deny", role: .destructive) { model.deny(guest) }
+                        .controlSize(.small)
                 }
             }
         }
@@ -432,9 +547,14 @@ struct StudioSidePanel: View {
                     if participant.isSelf { Text("you").foregroundStyle(theme.secondary) }
                     Spacer()
                     if !participant.audioEnabled { Image(systemName: "mic.slash") }
-                    if model.isModerator, !participant.isSelf, audience {
-                        Button("Bring on air") { model.bringOnAir(participant) }
-                            .controlSize(.small)
+                    if model.isModerator, !participant.isSelf {
+                        if audience {
+                            Button("Bring on air") { model.bringOnAir(participant) }
+                                .controlSize(.small)
+                        } else {
+                            Button("Off air") { model.pendingConfirm = .takeOffStage(participant) }
+                                .controlSize(.small)
+                        }
                         Button("Kick", role: .destructive) { model.pendingConfirm = .kick(participant) }
                             .controlSize(.small)
                     }
@@ -442,5 +562,4 @@ struct StudioSidePanel: View {
             }
         }
     }
-
 }

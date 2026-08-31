@@ -43,6 +43,14 @@ public enum StudioStageLayout {
     public static let stripMax = 6
     public static let gridMax = 9
 
+    /// Column count matching web `studio-stage.tsx` breakpoints.
+    public static func gridColumns(tileCount: Int, regularWidth: Bool) -> Int {
+        if tileCount <= 1 { return 1 }
+        if tileCount <= 4 { return 2 }
+        if tileCount <= 6 { return regularWidth ? 3 : 2 }
+        return regularWidth ? 4 : 3
+    }
+
     public static func isOnStage(_ status: StudioStageStatus?) -> Bool {
         status == nil || status == .onStage
     }

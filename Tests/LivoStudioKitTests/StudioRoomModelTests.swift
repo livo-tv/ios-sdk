@@ -12,6 +12,8 @@ final class MockMeetingController: MeetingControlling {
     var mic = true
     var kicked: [String] = []
     var admitted: [String] = []
+    var granted: [String] = []
+    var rejected: [String] = []
     var chats: [String] = []
     var screenShare = false
     var stageJoined = false
@@ -51,7 +53,8 @@ final class MockMeetingController: MeetingControlling {
     func enableScreenShare() { screenShare = true }
     func disableScreenShare() { screenShare = false }
     func acceptWaitingRoom(id: String) { admitted.append(id) }
-    func rejectWaitingRoom(id: String) {}
+    func rejectWaitingRoom(id: String) { rejected.append(id) }
+    func acceptAllWaitingRoom(ids: [String]) { admitted.append(contentsOf: ids) }
     func kick(id: String) { kicked.append(id) }
     func pin(id: String) {}
     func unpin(id: String) {}
@@ -60,7 +63,7 @@ final class MockMeetingController: MeetingControlling {
     func cancelStageRequest() { cancelledStage = true }
     func joinStage() { stageJoined = true }
     func leaveStage() { stageLeft = true }
-    func grantStage(id: String) {}
+    func grantStage(id: String) { granted.append(id) }
     func denyStage(id: String) {}
     func takeOffStage(id: String) {}
     func muteRemoteAudio(id: String) { muted.append(id) }
@@ -223,5 +226,93 @@ struct StudioRoomModelTests {
         model.confirmMute()
         #expect(meeting.muted == ["p2"])
         #expect(meeting.broadcasts.first?.0 == "host-media")
+    }
+
+    @Test func admitAsPanelistQueuesGrantWhenAlreadyJoined() async {
+        let meeting = MockMeetingController()
+        let model = StudioRoomModel(session: session(), meeting: meeting)
+        await model.start()
+        model.meetingDidUpdateParticipants([
+            StudioParticipant(id: "self", name: "Host", isSelf: true, audioEnabled: true, videoEnabled: true),
+            StudioParticipant(id: "g1", name: "Pat", isSelf: false, audioEnabled: true, videoEnabled: true, userId: "u1", stageStatus: .offStage),
+        ])
+        model.admit(StudioWaitlistedGuest(id: "g1", name: "Pat", userId: "u1"), as: .panelist)
+        #expect(meeting.admitted == ["g1"])
+        #expect(meeting.granted.contains("u1"))
+    }
+
+    @Test func admitAllAsPanelistsGrantsEach() async {
+        let meeting = MockMeetingController()
+        let model = StudioRoomModel(session: session(), meeting: meeting)
+        await model.start()
+        model.meetingDidUpdateWaitlist([
+            StudioWaitlistedGuest(id: "g1", name: "Pat", userId: "u1"),
+            StudioWaitlistedGuest(id: "g2", name: "Sam", userId: "u2"),
+        ])
+        model.meetingDidUpdateParticipants([
+            StudioParticipant(id: "self", name: "Host", isSelf: true, audioEnabled: true, videoEnabled: true),
+            StudioParticipant(id: "g1", name: "Pat", isSelf: false, audioEnabled: true, videoEnabled: true, userId: "u1"),
+            StudioParticipant(id: "g2", name: "Sam", isSelf: false, audioEnabled: true, videoEnabled: true, userId: "u2"),
+        ])
+        model.admitAll(as: .panelist)
+        #expect(meeting.admitted == ["g1", "g2"])
+        #expect(meeting.granted.contains("u1"))
+        #expect(meeting.granted.contains("u2"))
+    }
+
+    @Test func admitAsAudienceDoesNotGrantStage() async {
+        let meeting = MockMeetingController()
+        let model = StudioRoomModel(session: session(), meeting: meeting)
+        await model.start()
+        model.admit(StudioWaitlistedGuest(id: "g1", name: "Pat", userId: "u1"), as: .audience)
+        #expect(meeting.admitted == ["g1"])
+        #expect(meeting.granted.isEmpty)
+    }
+
+    @Test func stopScreenBroadcastsHostMedia() async {
+        let meeting = MockMeetingController()
+        let model = StudioRoomModel(session: session(), meeting: meeting)
+        await model.start()
+        let guest = StudioParticipant(id: "p2", name: "Bo", isSelf: false, audioEnabled: true, videoEnabled: true, userId: "u2")
+        model.pendingConfirm = .stopScreen(guest)
+        model.confirmStopScreen()
+        #expect(meeting.broadcasts.contains { $0.0 == "host-media" && $0.1["kind"] == "screen" && $0.1["userId"] == "u2" })
+    }
+
+    @Test func hostMediaScreenDisablesLocalShare() async {
+        let meeting = MockMeetingController()
+        let guest = StudioSession(
+            authToken: "rtk",
+            meetingId: "mtg",
+            role: .guest,
+            stream: StudioStreamSummary(id: "stm", title: "Show", status: "preview")
+        )
+        let model = StudioRoomModel(session: guest, meeting: meeting)
+        await model.start()
+        meeting.screenShare = true
+        model.meetingDidReceiveBroadcast(.hostMedia(kind: .screen, targetUserId: "self"))
+        #expect(meeting.screenShare == false)
+        #expect(model.toasts.contains { $0.message.contains("screen") })
+    }
+
+    @Test func screenShareFailureRollsBack() async {
+        let meeting = MockMeetingController()
+        let model = StudioRoomModel(session: session(), meeting: meeting)
+        await model.start()
+        model.meetingDidFailScreenShare(reason: "No broadcast extension")
+        #expect(!model.screenShareOn)
+        #expect(model.toasts.contains { $0.message.contains("broadcast") })
+    }
+
+    @Test func hostTileHintShowsOnce() async {
+        let defaults = UserDefaults(suiteName: "livo.studio.tests.\(UUID().uuidString)")!
+        defaults.removeObject(forKey: StudioRoomModel.hostTileHintKey)
+        let meeting = MockMeetingController()
+        let model = StudioRoomModel(session: session(), meeting: meeting, defaults: defaults)
+        await model.start()
+        #expect(model.toasts.contains { $0.message.contains("long-press") })
+        let again = StudioRoomModel(session: session(), meeting: MockMeetingController(), defaults: defaults)
+        await again.start()
+        #expect(!again.toasts.contains { $0.message.contains("long-press") })
     }
 }

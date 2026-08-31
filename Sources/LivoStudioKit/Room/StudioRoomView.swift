@@ -6,6 +6,7 @@ import SwiftUI
 public struct StudioRoomView: View {
     @Environment(\.studioTheme) private var theme
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @StateObject private var model: StudioRoomModel
 
     public init(
@@ -88,15 +89,24 @@ public struct StudioRoomView: View {
         }
     }
 
+    private var regularWidth: Bool { horizontalSizeClass == .regular }
+
     private var room: some View {
         VStack(spacing: 0) {
             StudioHeaderBar(model: model)
-            ParticipantGridView(model: model)
+            if regularWidth {
+                HStack(spacing: 0) {
+                    ParticipantGridView(model: model, regularWidth: true)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    StudioSidePanel(model: model, fillsHeight: true)
+                        .frame(width: 340)
+                }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            if model.isModerator, !model.waitlist.isEmpty {
-                WaitingRoomStrip(model: model)
+            } else {
+                ParticipantGridView(model: model, regularWidth: false)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                StudioSidePanel(model: model, fillsHeight: false)
             }
-            StudioSidePanel(model: model)
             StudioToolbar(model: model)
         }
         .foregroundStyle(theme.foreground)
@@ -107,6 +117,7 @@ public struct StudioRoomView: View {
         case .kick: "Remove this person?"
         case .mute: "Mute this person?"
         case .stopCamera: "Stop their camera?"
+        case .stopScreen: "Stop their screen share?"
         case .takeOffStage: "Take them off stage?"
         case .none: ""
         }
@@ -117,6 +128,7 @@ public struct StudioRoomView: View {
         case .kick: "They will be removed from the studio."
         case .mute: "Their microphone will be turned off."
         case .stopCamera: "Their camera will be turned off."
+        case .stopScreen: "Their screen share will be turned off."
         case .takeOffStage: "They will become audience and leave the stage."
         case .none: ""
         }
@@ -131,6 +143,8 @@ public struct StudioRoomView: View {
             Button("Mute", role: .destructive) { model.confirmMute() }
         case .stopCamera:
             Button("Stop camera", role: .destructive) { model.confirmStopCamera() }
+        case .stopScreen:
+            Button("Stop screen share", role: .destructive) { model.confirmStopScreen() }
         case .takeOffStage:
             Button("Take off stage", role: .destructive) {
                 if case let .takeOffStage(participant) = model.pendingConfirm {
