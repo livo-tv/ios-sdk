@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/livo-tv/ios-sdk/compare/v1.0.0...v1.1.0) (2026-08-31)
+
+
+### Features
+
+* enhance meeting controls and UI for screen sharing ([58c6b03](https://github.com/livo-tv/ios-sdk/commit/58c6b03f2fa79d19222cced6826615c8515bdb00))
+
 # Changelog
 
 ## 1.0.0 (2026-08-30)
