@@ -643,6 +643,23 @@ struct StudioRoomModelTests {
         #expect(meeting.takenOffStage == ["g1"])
     }
 
+    @Test func grantBeforeRoomJoinFlushesOnDidJoin() async {
+        let meeting = MockMeetingController()
+        let guest = StudioSession(
+            authToken: "rtk",
+            meetingId: "mtg",
+            role: .guest,
+            stream: StudioStreamSummary(id: "stm", title: "Show", status: "preview")
+        )
+        let model = StudioRoomModel(session: guest, meeting: meeting)
+        model.meetingSelfStageDidChange(.acceptedToJoinStage)
+        #expect(meeting.joinStageCount == 1)
+        model.meetingDidJoin()
+        #expect(meeting.joinStageCount == 2)
+        #expect(model.phase == .inRoom)
+        model.tearDown()
+    }
+
     @Test func joinStageWatchdogRetriesWhileAccepted() async {
         let meeting = MockMeetingController()
         let guest = StudioSession(

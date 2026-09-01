@@ -751,6 +751,10 @@ extension StudioRoomModel: MeetingControllerDelegate {
             onEvent?(.joined(streamId: session.stream.id))
             showHostTileHintIfNeeded()
         }
+        if selfStageStatus == .acceptedToJoinStage {
+            meeting.joinStage()
+            startJoinStageWatchdog()
+        }
     }
 
     public func meetingDidWaitlist() {

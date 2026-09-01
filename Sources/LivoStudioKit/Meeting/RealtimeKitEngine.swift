@@ -65,6 +65,8 @@ actor RealtimeKitEngine {
     private var relay: RealtimeKitListenerRelay?
     private var joining = false
     private var didJoinRoom = false
+    private var pendingStageJoin = false
+    private var joinStageInFlight = false
 
     init() {
         executor = DispatchQueueSerialExecutor(label: "tv.livo.studio.rtk")
@@ -136,10 +138,13 @@ actor RealtimeKitEngine {
         publishMedia()
         publishSelfStage()
         publishDevices()
+        flushPendingStageJoin()
     }
 
     func leave() {
         didJoinRoom = false
+        pendingStageJoin = false
+        joinStageInFlight = false
         joining = false
         let outgoing = meeting
         meeting = nil
@@ -247,28 +252,12 @@ actor RealtimeKitEngine {
     }
 
     func joinStage() {
-        guard didJoinRoom else { return }
-        if currentStageStatus() == .onStage {
-            publishSelfStage()
-            publishParticipants()
-            return
-        }
-        if let error = meeting?.stage.join() {
-            reportStageError(error)
-            publishSelfStage()
-            return
-        }
-        if currentStageStatus() == .onStage {
-            republishCameraIfOn()
-            publishSelfStage()
-            publishParticipants()
-            publishMedia()
-        } else {
-            publishSelfStage()
-        }
+        pendingStageJoin = true
+        flushPendingStageJoin()
     }
 
     func leaveStage() {
+        pendingStageJoin = false
         reportStageError(meeting?.stage.leave())
         publishSelfStage()
     }
@@ -329,6 +318,59 @@ actor RealtimeKitEngine {
 
     private func currentStageStatus() -> StageStatus? {
         meeting?.stage.stageStatus ?? meeting?.localUser.stageStatus
+    }
+
+    private func isStageAccepted() -> Bool {
+        meeting?.stage.stageStatus == .acceptedToJoinStage
+            || meeting?.localUser.stageStatus == .acceptedToJoinStage
+    }
+
+    private func isStageBusyError(_ error: StageError) -> Bool {
+        let message = error.message
+        return message.contains("2006")
+            || message.contains("ERR2006")
+            || message.localizedCaseInsensitiveContains("OFF_STAGE")
+            || message.localizedCaseInsensitiveContains("concurrent")
+    }
+
+    private func flushPendingStageJoin() {
+        guard didJoinRoom else { return }
+        guard pendingStageJoin || isStageAccepted() else { return }
+        guard !joinStageInFlight else { return }
+        joinStageInFlight = true
+        Task { await self.runJoinStageAttempts() }
+    }
+
+    private func runJoinStageAttempts() async {
+        defer { joinStageInFlight = false }
+        for attempt in 0 ..< 3 {
+            if currentStageStatus() == .onStage {
+                pendingStageJoin = false
+                publishSelfStage()
+                publishParticipants()
+                return
+            }
+            if let error = meeting?.stage.join() {
+                if isStageBusyError(error), attempt < 2 {
+                    try? await Task.sleep(for: .seconds(1))
+                    continue
+                }
+                reportStageError(error)
+                publishSelfStage()
+                return
+            }
+            pendingStageJoin = false
+            if currentStageStatus() == .onStage {
+                republishCameraIfOn()
+                publishSelfStage()
+                publishParticipants()
+                publishMedia()
+            } else {
+                publishSelfStage()
+            }
+            return
+        }
+        publishSelfStage()
     }
 
     private func republishCameraIfOn() {
@@ -501,6 +543,7 @@ actor RealtimeKitEngine {
         didJoinRoom = true
         notify { $0.engineDidJoin() }
         publishParticipants()
+        flushPendingStageJoin()
     }
 
     fileprivate func handleWaitList(_ status: WaitListStatus) {
@@ -868,7 +911,8 @@ extension RealtimeKitEngine {
     }
 
     fileprivate func handleStageStatus(_ newStatus: StageStatus) {
-        if newStatus == .acceptedToJoinStage {
+        if newStatus == .acceptedToJoinStage || isStageAccepted() {
+            pendingStageJoin = true
             joinStage()
         }
         publishSelfStage()
