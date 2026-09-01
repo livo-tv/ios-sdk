@@ -6,6 +6,8 @@ The GitHub repo is **public**. Third-party apps resolve `https://github.com/livo
 
 ## What the pipeline does
 
+One workflow: `.github/workflows/ci.yml`. macos-15 runs `./scripts/ci-check.sh` on pull requests, `workflow_dispatch`, and push to `main`/`dev`. The Ubuntu `release` job runs only after that check succeeds on `main` or `dev` (semantic-release git tags, no Xcode).
+
 | Branch | Tag | GitHub Release | npm |
 | --- | --- | --- | --- |
 | `main` | `vX.Y.Z` | stable | never |
@@ -19,7 +21,7 @@ Conventional commits are required (`feat:` → minor, `fix:` → patch, `BREAKIN
 
 `v1.0.0` is already on `main`. Later releasable commits cut `v1.1.0`, `v1.0.1`, and so on.
 
-If `release.yml` no-ops, the latest commit was not releasable — add a `feat:` or `fix:` and push again.
+If the `release` job no-ops, the latest commit was not releasable — add a `feat:` or `fix:` and push again.
 
 ## Optional `dev` branch
 
@@ -29,5 +31,5 @@ Pushing releasable commits to `dev` cuts `vX.Y.Z-rc.N`. `from: "1.0.0"` skips pr
 
 - Do not hand-edit `package.json` `version` or create tags locally.
 - Bump `realtimekit-ios-core` only with a semver pin in `Package.swift` (not `branch: "main"`).
-- Re-run a stuck release with **Actions → Release → Run workflow** on the branch that has the unreleased commits.
+- Re-run a stuck release with **Actions → CI → Run workflow** on the branch that has the unreleased commits.
 - Keep the README partner-facing. Do not document first-party deploy secrets here.
