@@ -46,7 +46,16 @@ Pin a **version**, never `branch: "main"`. Prerelease tags (`1.2.3-rc.1`) are no
 <string>Livo Studio uses the camera so you can appear on the broadcast.</string>
 <key>NSMicrophoneUsageDescription</key>
 <string>Livo Studio uses the microphone so guests can hear you.</string>
+<key>UIBackgroundModes</key>
+<array>
+  <string>audio</string>
+</array>
 ```
+
+`UIBackgroundModes: audio` keeps the RealtimeKit socket alive when the user
+leaves the app briefly. Without it iOS suspends the process and every return
+to the studio is a full reconnect. Do not add `voip` unless you also ship
+CallKit / PushKit — App Review rejects the unused mode.
 
 ## Host
 

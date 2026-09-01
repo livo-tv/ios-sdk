@@ -43,3 +43,36 @@ final class VideoContainerView: UIView {
         ])
     }
 }
+
+/// Caches RealtimeKit renderers so SwiftUI refreshes do not allocate a new
+/// `getVideoView()`. Drop the entry when a track starts or stops — a view
+/// fetched while `videoEnabled` was false stays blank for Safari guests.
+@MainActor
+final class StudioVideoRendererCache {
+    private var views: [String: UIView] = [:]
+
+    static func key(participantId: String, screenShare: Bool) -> String {
+        screenShare ? "\(participantId)#screen" : participantId
+    }
+
+    func view(for participantId: String, screenShare: Bool) -> UIView? {
+        views[Self.key(participantId: participantId, screenShare: screenShare)]
+    }
+
+    func store(_ view: UIView, participantId: String, screenShare: Bool) {
+        views[Self.key(participantId: participantId, screenShare: screenShare)] = view
+    }
+
+    func invalidate(participantId: String, screenShare: Bool) {
+        views.removeValue(forKey: Self.key(participantId: participantId, screenShare: screenShare))
+    }
+
+    func invalidateAll(for participantId: String) {
+        invalidate(participantId: participantId, screenShare: false)
+        invalidate(participantId: participantId, screenShare: true)
+    }
+
+    func removeAll() {
+        views.removeAll()
+    }
+}

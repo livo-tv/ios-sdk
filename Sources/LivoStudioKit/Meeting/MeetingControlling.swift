@@ -4,9 +4,17 @@ import UIKit
 
 /// Abstraction over Cloudflare RealtimeKit so the SwiftUI room can be tested
 /// without the binary XCFramework.
+public enum StudioSignalingState: String, Sendable, Equatable {
+    case connected
+    case reconnecting
+    case disconnected
+    case failed
+}
+
 @MainActor
 public protocol MeetingControlling: AnyObject {
     var delegate: MeetingControllerDelegate? { get set }
+    var signalingState: StudioSignalingState { get }
 
     func join(authToken: String, enableAudio: Bool, enableVideo: Bool) async throws
     func leave()
@@ -57,6 +65,11 @@ public protocol MeetingControllerDelegate: AnyObject {
     func meetingDidReceiveBroadcast(_ message: StudioBroadcastMessage)
     func meetingDidFailScreenShare(reason: String)
     func meetingDidUpdateDevices()
+    func meetingDidWarn(_ message: String)
+}
+
+public extension MeetingControllerDelegate {
+    func meetingDidWarn(_ message: String) {}
 }
 
 public enum MeetingDisconnectReason: Sendable, Equatable {

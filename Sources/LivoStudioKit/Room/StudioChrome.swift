@@ -51,7 +51,14 @@ struct StudioHeaderBar: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .safeAreaPadding(.top)
-        .background(theme.background.opacity(0.92))
+        .safeAreaPadding(.horizontal)
+        .background(
+            LinearGradient(
+                colors: [theme.background.opacity(0.72), theme.background.opacity(0)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
     }
 }
 
@@ -223,18 +230,24 @@ struct ParticipantTile: View {
     private var participant: StudioParticipant { tile.participant }
 
     var body: some View {
+        let _ = model.rendererRevision
+        let video = model.videoView(for: tile)
         ZStack(alignment: .bottomLeading) {
-            Color.black
+            Color(white: 0.13)
             StudioVideoView(
-                view: model.videoView(for: tile),
+                view: video,
                 contentMode: tile.kind == .screen ? .scaleAspectFit : .scaleAspectFill
             )
-            if tile.kind == .idle {
-                Color.black.opacity(0.35)
-                Text(initials)
-                    .font(.title.weight(.semibold))
-                    .foregroundStyle(.white)
+            if video == nil {
+                GeometryReader { geo in
+                    let diameter = min(min(geo.size.width, geo.size.height) * 0.42, 120)
+                    StudioAvatarView(
+                        name: participant.name,
+                        picture: participant.picture,
+                        diameter: max(48, diameter)
+                    )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             }
             nameBar
         }
@@ -306,9 +319,6 @@ struct ParticipantTile: View {
         return parts.joined(separator: ", ")
     }
 
-    private var initials: String {
-        StudioChatGrouping.initials(participant.name)
-    }
 }
 
 struct StudioToolbar: View {
@@ -316,40 +326,133 @@ struct StudioToolbar: View {
     @Environment(\.studioTheme) private var theme
 
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 10) {
             if model.canUseMediaControls {
-                iconButton(model.micOn ? "mic.fill" : "mic.slash.fill", label: model.micOn ? "Mute" : "Unmute") {
+                circleButton(
+                    model.micOn ? "mic.fill" : "mic.slash.fill",
+                    off: !model.micOn,
+                    label: model.micOn ? "Mute" : "Unmute"
+                ) {
                     model.toggleMic()
                 }
-                iconButton(model.cameraOn ? "video.fill" : "video.slash.fill", label: model.cameraOn ? "Camera off" : "Camera on") {
+                circleButton(
+                    model.cameraOn ? "video.fill" : "video.slash.fill",
+                    off: !model.cameraOn,
+                    label: model.cameraOn ? "Camera off" : "Camera on"
+                ) {
                     model.toggleCamera()
                 }
-                iconButton("arrow.triangle.2.circlepath.camera", label: "Switch camera") {
-                    model.switchCamera()
+            }
+            tabToggle("bubble.left.fill", tab: .chat, label: "Chat", badge: model.unreadChat)
+            tabToggle("person.2.fill", tab: .people, label: "People", badge: model.peopleBadge)
+            circleButton("ellipsis", label: "More") {
+                model.showingMore = true
+            }
+            endButton
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial, in: Capsule())
+        .padding(.bottom, 8)
+        .safeAreaPadding(.bottom)
+    }
+
+    private var endButton: some View {
+        Button {
+            if model.canStop {
+                model.confirmStop = true
+            } else {
+                model.leave()
+            }
+        } label: {
+            Image(systemName: "phone.down.fill")
+                .font(.title3)
+                .foregroundStyle(.white)
+                .frame(minWidth: 52, minHeight: 44)
+                .background(theme.destructive, in: Capsule())
+        }
+        .accessibilityLabel(model.canStop ? "Stop broadcast" : "Leave")
+    }
+
+    private func tabToggle(_ system: String, tab: StudioRoomModel.SideTab, label: String, badge: Int) -> some View {
+        Button {
+            model.toggleSideTab(tab)
+        } label: {
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: system)
+                    .font(.title3)
+                    .frame(width: 44, height: 44)
+                if badge > 0 {
+                    Text("\(min(badge, 99))")
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(theme.primary, in: Capsule())
+                        .foregroundStyle(theme.background)
+                        .offset(x: 4, y: -2)
                 }
-                iconButton(model.screenShareOn ? "rectangle.badge.slash" : "rectangle.dashed.badge.record", label: "Screen share") {
+            }
+        }
+        .background(
+            model.selectedTab == tab ? theme.foreground.opacity(0.16) : .clear,
+            in: Circle()
+        )
+        .accessibilityLabel(badge > 0 ? "\(label), \(badge)" : label)
+        .accessibilityAddTraits(model.selectedTab == tab ? [.isSelected] : [])
+    }
+
+    private func circleButton(
+        _ system: String,
+        off: Bool = false,
+        label: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: system)
+                .font(.title3)
+                .foregroundStyle(off ? .white : theme.foreground)
+                .frame(width: 44, height: 44)
+                .background(off ? theme.destructive : theme.foreground.opacity(0.12), in: Circle())
+        }
+        .accessibilityLabel(label)
+    }
+}
+
+struct StudioMoreDrawer: View {
+    @ObservedObject var model: StudioRoomModel
+    @Environment(\.studioTheme) private var theme
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("More")
+                .font(.headline)
+                .padding(.top, 8)
+            if model.canUseMediaControls {
+                moreButton("arrow.triangle.2.circlepath.camera", "Switch camera") {
+                    model.switchCamera()
+                    dismiss()
+                }
+                moreButton(
+                    model.screenShareOn ? "rectangle.dashed.badge.record" : "rectangle.dashed.badge.record",
+                    model.screenShareOn ? "Stop share" : "Screen share"
+                ) {
                     model.toggleScreenShare()
+                    dismiss()
                 }
             }
             if !model.isModerator {
                 stageControl
             }
-            Spacer()
-            if model.canStop {
-                Button(role: .destructive) {
-                    model.confirmStop = true
-                } label: {
-                    Label("Stop", systemImage: "stop.circle.fill")
-                }
-                .tint(theme.destructive)
-            } else {
-                Button("Leave") { model.leave() }
+            moreButton("gearshape", "Settings") {
+                dismiss()
+                model.showingSettings = true
             }
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .safeAreaPadding(.bottom)
-        .background(theme.background.opacity(0.96))
+        .padding(.horizontal, 20)
+        .padding(.bottom, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
@@ -357,86 +460,81 @@ struct StudioToolbar: View {
         let status = model.selfStageStatus ?? model.selfParticipant?.stageStatus
         switch status {
         case .requestedToJoinStage:
-            Button("Cancel request") { model.cancelStageRequest() }
+            moreButton("hand.raised.slash", "Cancel request") {
+                model.cancelStageRequest()
+                dismiss()
+            }
         case .acceptedToJoinStage:
-            Button("Joining stage…") {}
-                .disabled(true)
+            moreButton("person.badge.plus", "Joining stage…") {
+                model.joinStage()
+                dismiss()
+            }
         case .onStage:
-            Button("Leave stage") { model.leaveStage() }
+            moreButton("arrow.down.left.and.arrow.up.right", "Leave stage") {
+                model.leaveStage()
+                dismiss()
+            }
         case .offStage, .none:
-            Button("Ask to join stage") { model.requestStage() }
+            moreButton("hand.raised", "Ask to join stage") {
+                model.requestStage()
+                dismiss()
+            }
         }
     }
 
-    private func iconButton(_ system: String, label: String, action: @escaping () -> Void) -> some View {
+    private func moreButton(_ system: String, _ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: system)
-                .font(.title3)
-                .frame(width: 44, height: 44)
+            HStack(spacing: 12) {
+                Image(systemName: system)
+                    .frame(width: 28)
+                Text(title)
+                Spacer(minLength: 0)
+            }
+            .font(.body)
+            .foregroundStyle(theme.foreground)
+            .padding(.horizontal, 14)
+            .frame(minHeight: 48)
+            .background(theme.foreground.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
         }
-        .accessibilityLabel(label)
+        .accessibilityLabel(title)
     }
 }
 
 struct StudioSidePanel: View {
     @ObservedObject var model: StudioRoomModel
-    var fillsHeight = false
     @Environment(\.studioTheme) private var theme
-    @State private var compactHeight: CGFloat = 280
-    @State private var dragStartHeight: CGFloat = 280
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if !fillsHeight {
-                compactResizeHandle
-            }
             HStack(spacing: 8) {
                 tab("People", tab: .people, badge: model.peopleBadge)
                 tab("Chat", tab: .chat, badge: model.unreadChat)
+                Spacer(minLength: 0)
+                Button {
+                    model.selectedTab = nil
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.body.weight(.semibold))
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Close panel")
             }
+            Divider()
 
             switch model.selectedTab {
             case .people:
                 people
             case .chat:
                 StudioChatPanel(model: model)
+            case .none:
+                EmptyView()
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.top, fillsHeight ? 12 : 4)
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
         .padding(.bottom, 12)
-        .frame(maxHeight: fillsHeight ? .infinity : compactHeight)
-        .background(theme.foreground.opacity(0.05))
-    }
-
-    private var compactResizeHandle: some View {
-        Capsule()
-            .fill(theme.foreground.opacity(0.28))
-            .frame(width: 36, height: 5)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 6)
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 4)
-                    .onChanged { value in
-                        compactHeight = min(520, max(180, dragStartHeight - value.translation.height))
-                    }
-                    .onEnded { _ in
-                        dragStartHeight = compactHeight
-                    }
-            )
-            .accessibilityLabel("Resize people and chat panel")
-            .accessibilityAdjustableAction { direction in
-                switch direction {
-                case .increment:
-                    compactHeight = min(520, compactHeight + 40)
-                case .decrement:
-                    compactHeight = max(180, compactHeight - 40)
-                @unknown default:
-                    break
-                }
-                dragStartHeight = compactHeight
-            }
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(theme.background)
     }
 
     private func tab(_ title: String, tab: StudioRoomModel.SideTab, badge: Int) -> some View {
@@ -504,6 +602,7 @@ struct StudioSidePanel: View {
             }
             ForEach(model.waitlist) { guest in
                 HStack {
+                    StudioAvatarView(name: guest.name, picture: guest.picture, diameter: 32)
                     Text(guest.name)
                     Spacer()
                     Menu("Admit") {
@@ -525,6 +624,7 @@ struct StudioSidePanel: View {
                 .foregroundStyle(theme.secondary)
             ForEach(model.stageRequests) { request in
                 HStack {
+                    StudioAvatarView(name: request.name, picture: nil, diameter: 32)
                     Text(request.name)
                     Spacer()
                     Button("Bring on air") { model.grantStage(request) }
@@ -543,6 +643,11 @@ struct StudioSidePanel: View {
                 .foregroundStyle(theme.secondary)
             ForEach(rows) { participant in
                 HStack {
+                    StudioAvatarView(
+                        name: participant.name,
+                        picture: participant.picture,
+                        diameter: 32
+                    )
                     Text(participant.name)
                     if participant.isSelf { Text("you").foregroundStyle(theme.secondary) }
                     Spacer()

@@ -8,6 +8,10 @@
 	<string>Livo Studio uses the camera so you can appear on the broadcast.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Livo Studio uses the microphone so guests can hear you.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict/>
 </dict>

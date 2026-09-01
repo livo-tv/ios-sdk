@@ -27,21 +27,32 @@ public struct StudioStageArrangement: Equatable, Sendable {
     public var spotlight: [StudioDisplayTile]
     public var strip: [StudioDisplayTile]
     public var overflow: Int
+    /// Self camera/idle when others are on stage and self is not pinned.
+    public var pip: StudioDisplayTile?
 
     public init(
         spotlight: [StudioDisplayTile] = [],
         strip: [StudioDisplayTile] = [],
-        overflow: Int = 0
+        overflow: Int = 0,
+        pip: StudioDisplayTile? = nil
     ) {
         self.spotlight = spotlight
         self.strip = strip
         self.overflow = overflow
+        self.pip = pip
     }
 }
 
 public enum StudioStageLayout {
     public static let stripMax = 6
     public static let gridMax = 9
+
+    /// iPad idiom wins over a compact size class (fullScreenCover can lie).
+    /// Regular width alone is not enough — Plus/Max iPhones are regular×compact
+    /// in landscape and must keep phone chrome.
+    public static func prefersRegularLayout(regularWidth: Bool, regularHeight: Bool, isPad: Bool) -> Bool {
+        isPad || (regularWidth && regularHeight)
+    }
 
     /// Column count matching web `studio-stage.tsx` breakpoints.
     public static func gridColumns(tileCount: Int, regularWidth: Bool) -> Int {
@@ -96,24 +107,26 @@ public enum StudioStageLayout {
         activeSpeakerId: String? = nil,
         max: Int? = nil
     ) -> StudioStageArrangement {
-        let pinned = tiles.first(where: \.pinned)
+        let pip = extractPip(from: tiles)
+        let stageTiles = tiles.filter { $0.tileId != pip?.tileId }
+        let pinned = stageTiles.first(where: \.pinned)
         let spotlight: [StudioDisplayTile]
         let remaining: [StudioDisplayTile]
         if let pinned {
-            let pinTiles = tiles.filter { $0.participant.id == pinned.participant.id }
+            let pinTiles = stageTiles.filter { $0.participant.id == pinned.participant.id }
             let focus = pinTiles.first(where: { $0.kind == .screen })
                 ?? pinTiles.first(where: { $0.kind == .camera })
                 ?? pinTiles.first
             if let focus {
                 spotlight = [focus]
-                remaining = tiles.filter { $0.tileId != focus.tileId }
+                remaining = stageTiles.filter { $0.tileId != focus.tileId }
             } else {
                 spotlight = []
-                remaining = tiles
+                remaining = stageTiles
             }
         } else {
-            spotlight = tiles.filter { $0.kind == .screen }
-            remaining = tiles.filter { $0.kind != .screen }
+            spotlight = stageTiles.filter { $0.kind == .screen }
+            remaining = stageTiles.filter { $0.kind != .screen }
         }
         let cap = max ?? (spotlight.isEmpty ? gridMax : stripMax)
         let ranked = remaining.sorted { lhs, rhs in
@@ -122,14 +135,23 @@ public enum StudioStageLayout {
             return lhs.tileId < rhs.tileId
         }
         if ranked.count <= cap {
-            return StudioStageArrangement(spotlight: spotlight, strip: ranked, overflow: 0)
+            return StudioStageArrangement(spotlight: spotlight, strip: ranked, overflow: 0, pip: pip)
         }
         let kept = takeCappedStrip(ranked, cap: cap)
         return StudioStageArrangement(
             spotlight: spotlight,
             strip: kept,
-            overflow: ranked.count - kept.count
+            overflow: ranked.count - kept.count,
+            pip: pip
         )
+    }
+
+    /// Float self camera/idle when someone else is on stage and self is not pinned.
+    /// Self screen-share tiles stay on the stage.
+    static func extractPip(from tiles: [StudioDisplayTile]) -> StudioDisplayTile? {
+        if tiles.contains(where: { $0.isSelf && $0.pinned }) { return nil }
+        guard tiles.contains(where: { !$0.isSelf }) else { return nil }
+        return tiles.first { $0.isSelf && $0.kind != .screen }
     }
 
     private static func stripRank(_ tile: StudioDisplayTile, activeSpeakerId: String?) -> Int {

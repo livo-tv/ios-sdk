@@ -29,9 +29,10 @@ final class SampleHandler: RtkSampleHandler {}
 
 ## 2. App Group
 
-1. Add the **App Groups** capability to the app target and the extension.
-2. Use the same identifier, for example `group.your.bundle.studio`.
-3. Put this in **both** Info.plist files:
+1. Create the App Group in [Apple Developer](https://developer.apple.com/account/resources/identifiers/list/applicationGroup) and enable it on the app and extension App IDs. Entitlements in the repo are not enough — the group must exist on the team and the **device provisioning profile** must include it. If it does not, RealtimeKit logs a CFPrefs `group.*` failure and `ScreenCaptureController#startCapture` throws; screen share never starts.
+2. Add the **App Groups** capability to the app target and the extension.
+3. Use the same identifier, for example `group.your.bundle.studio`.
+4. Put this in **both** Info.plist files:
 
 ```xml
 <key>RTKRTCAppGroupIdentifier</key>
@@ -54,3 +55,9 @@ RealtimeKit presents the picker and `screenShareOn` follows
 toggle back and toasts.
 
 See [RealtimeKit local participant — screen share (iOS)](https://developers.cloudflare.com/realtime/realtimekit/core/local-participant/).
+
+## Background audio
+
+The host app Info.plist must also declare `UIBackgroundModes` → `audio`. Without
+it iOS suspends the process a few seconds after backgrounding and the
+RealtimeKit socket dies. See the [README Info.plist section](../README.md#infoplist).

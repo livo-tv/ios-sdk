@@ -36,6 +36,25 @@ enum StudioChatGrouping {
         let letters = parts.compactMap(\.first)
         return letters.isEmpty ? "?" : String(letters).uppercased()
     }
+
+    static let overlayMaxAge: TimeInterval = 6
+    static let overlayMaxLines = 3
+
+    static func overlayPreview(
+        messages: [StudioChatMessage],
+        selfUserId: String?,
+        now: TimeInterval,
+        maxAge: TimeInterval = overlayMaxAge,
+        maxLines: Int = overlayMaxLines
+    ) -> StudioChatGroup? {
+        let groups = group(messages, selfUserId: selfUserId)
+        guard var last = groups.last, let newest = last.rows.last else { return nil }
+        guard now - newest.time <= maxAge else { return nil }
+        if last.rows.count > maxLines {
+            last.rows = Array(last.rows.suffix(maxLines))
+        }
+        return last
+    }
 }
 
 struct StudioChatPanel: View {

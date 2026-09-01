@@ -141,4 +141,42 @@ struct ControlClientTests {
         }
     }
 }
+
+struct StudioParticipantStageIdTests {
+    @Test func emptyOrNilUserIdFallsBackToPeerId() {
+        let empty = StudioParticipant(
+            id: "g1",
+            name: "Pat",
+            isSelf: false,
+            audioEnabled: true,
+            videoEnabled: true,
+            userId: ""
+        )
+        #expect(empty.stageId == "g1")
+        let missing = StudioParticipant(
+            id: "g2",
+            name: "Sam",
+            isSelf: false,
+            audioEnabled: true,
+            videoEnabled: true
+        )
+        #expect(missing.stageId == "g2")
+        let named = StudioParticipant(
+            id: "g3",
+            name: "Bo",
+            isSelf: false,
+            audioEnabled: true,
+            videoEnabled: true,
+            userId: "u3"
+        )
+        #expect(named.stageId == "u3")
+    }
+
+    @Test func stageRequestEmptyUserIdFallsBackToPeerId() {
+        let empty = StudioStageRequest(userId: "", peerId: "p1", name: "Pat")
+        #expect(empty.stageId == "p1")
+        let named = StudioStageRequest(userId: "u1", peerId: "p1", name: "Pat")
+        #expect(named.stageId == "u1")
+    }
+}
 }

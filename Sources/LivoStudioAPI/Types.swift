@@ -102,6 +102,11 @@ public struct StudioStageRequest: Hashable, Identifiable, Sendable {
         self.peerId = peerId
         self.name = name
     }
+
+    /// Same `userId || peerId` fallback as `StudioParticipant.stageId`.
+    public var stageId: String {
+        userId.isEmpty ? peerId : userId
+    }
 }
 
 public struct StudioParticipant: Hashable, Identifiable, Sendable {
@@ -138,6 +143,13 @@ public struct StudioParticipant: Hashable, Identifiable, Sendable {
         self.userId = userId
         self.stageStatus = stageStatus
         self.pinned = pinned
+    }
+
+    /// RTK stage APIs key on `userId`, but anonymous guests have an empty one.
+    /// Mirrors the web adapter's `userId || id` truthiness fallback.
+    public var stageId: String {
+        if let userId, !userId.isEmpty { return userId }
+        return id
     }
 }
 

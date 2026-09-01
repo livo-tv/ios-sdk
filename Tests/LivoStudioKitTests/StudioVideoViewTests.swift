@@ -34,6 +34,21 @@ struct StudioVideoViewTests {
         #expect(video.contentMode == .scaleAspectFill)
     }
 
+    @Test func rendererCacheDropsOnInvalidate() {
+        let cache = StudioVideoRendererCache()
+        let first = UIView()
+        let second = UIView()
+        cache.store(first, participantId: "g1", screenShare: false)
+        #expect(cache.view(for: "g1", screenShare: false) === first)
+        cache.invalidate(participantId: "g1", screenShare: false)
+        #expect(cache.view(for: "g1", screenShare: false) == nil)
+        cache.store(first, participantId: "g1", screenShare: false)
+        cache.store(second, participantId: "g1", screenShare: true)
+        cache.invalidateAll(for: "g1")
+        #expect(cache.view(for: "g1", screenShare: false) == nil)
+        #expect(cache.view(for: "g1", screenShare: true) == nil)
+    }
+
     @Test func attachNilClearsRenderer() {
         let container = VideoContainerView()
         let video = SuperviewProbe()

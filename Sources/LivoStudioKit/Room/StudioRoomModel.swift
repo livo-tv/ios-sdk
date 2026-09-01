@@ -46,13 +46,19 @@ public final class StudioRoomModel: ObservableObject {
     @Published public private(set) var videoDevices: [StudioMediaDevice] = []
     @Published public private(set) var selectedAudioId: String?
     @Published public private(set) var selectedVideoId: String?
+    @Published public private(set) var rendererRevision = 0
     @Published public var confirmStop = false
     @Published public var showingSettings = false
     @Published public var pendingConfirm: PendingConfirm?
-    @Published public var selectedTab: SideTab = .people {
+    @Published public var showingMore = false
+    @Published public var selectedTab: SideTab? {
         didSet {
             if selectedTab == .chat { unreadChat = 0 }
         }
+    }
+
+    public func toggleSideTab(_ tab: SideTab) {
+        selectedTab = selectedTab == tab ? nil : tab
     }
 
     public enum SideTab: String, CaseIterable, Identifiable, Sendable {
@@ -97,7 +103,20 @@ public final class StudioRoomModel: ObservableObject {
     private var knownStageRequestIds = Set<String>()
     private var toastTasks: [UUID: Task<Void, Never>] = [:]
     private var pendingPanelists = Set<String>()
+    private var cameraPausedForBackground = false
+    private var wasBackgrounded = false
+    private var reconnecting = false
+    private var grantVerifyTasks: [String: Task<Void, Never>] = [:]
+    private var joinStageWatchdog: Task<Void, Never>?
+    private var signalingGraceTask: Task<Void, Never>?
+    private var rendererRetryTask: Task<Void, Never>?
+    private var backgroundTaskId: UUID?
+    private let backgroundTasks: BackgroundTaskHolding
     private let defaults: UserDefaults
+    var signalingGraceInterval: Duration = .milliseconds(300)
+    var signalingGraceAttempts = 20
+    var rendererRetryDelay: Duration = .milliseconds(500)
+    var rendererRetryLimit = 6
     static let hostTileHintKey = "livo.studio.hostTileHintShown"
 
     public var isModerator: Bool { session.role == .moderator }
@@ -129,12 +148,14 @@ public final class StudioRoomModel: ObservableObject {
         apiURL: URL = LivoAPIConfiguration.productionAPIURL,
         meeting: MeetingControlling? = nil,
         defaults: UserDefaults = .standard,
+        backgroundTasks: BackgroundTaskHolding? = nil,
         onEvent: ((StudioEvent) -> Void)? = nil
     ) {
         self.session = session
         self.apiURL = apiURL
         self.meeting = meeting ?? MeetingControllerFactory.makeDefault()
         self.defaults = defaults
+        self.backgroundTasks = backgroundTasks ?? UIApplicationBackgroundTaskHolder()
         self.onEvent = onEvent
         streamStatus = session.stream.status
         if let token = session.studioControlToken {
@@ -145,6 +166,7 @@ public final class StudioRoomModel: ObservableObject {
 
     public func start() async {
         phase = .connecting
+        StudioAudioSession.configure()
         do {
             try await meeting.join(
                 authToken: session.authToken,
@@ -178,6 +200,7 @@ public final class StudioRoomModel: ObservableObject {
         }
         stopping = false
         setKeepAwake(false)
+        StudioAudioSession.relinquish()
     }
 
     public func leave() {
@@ -187,6 +210,8 @@ public final class StudioRoomModel: ObservableObject {
         setKeepAwake(false)
         statusTask?.cancel()
         refreshTask?.cancel()
+        endBackgroundTask()
+        StudioAudioSession.relinquish()
     }
 
     /// Host apps present the room in a cover/sheet. Close on a terminal
@@ -200,8 +225,70 @@ public final class StudioRoomModel: ObservableObject {
         }
     }
 
+    public func pauseOutgoingCamera() {
+        wasBackgrounded = true
+        guard cameraOn, !cameraPausedForBackground else { return }
+        cameraPausedForBackground = true
+        meeting.setCameraEnabled(false)
+    }
+
+    public func resumeOutgoingCamera() {
+        cameraPausedForBackground = false
+        guard cameraOn else { return }
+        meeting.setCameraEnabled(false)
+        meeting.setCameraEnabled(true)
+    }
+
+    public func handleSceneBackgrounded() {
+        beginBackgroundTaskIfNeeded()
+        pauseOutgoingCamera()
+    }
+
+    public func handleSceneBecameActive() async {
+        endBackgroundTask()
+        let backgrounded = wasBackgrounded
+        if cameraPausedForBackground || backgrounded {
+            wasBackgrounded = false
+            resumeOutgoingCamera()
+        }
+        guard phase == .inRoom, backgrounded else { return }
+        await recoverSignalingIfNeeded()
+    }
+
+    public func reconnect() async {
+        guard !reconnecting else { return }
+        switch phase {
+        case .ended, .left, .rejected:
+            return
+        case .connecting, .waitlisted, .inRoom, .failed:
+            break
+        }
+        reconnecting = true
+        meeting.leave()
+        phase = .connecting
+        StudioAudioSession.configure()
+        do {
+            try await meeting.join(
+                authToken: session.authToken,
+                enableAudio: micOn,
+                enableVideo: cameraOn
+            )
+            setKeepAwake(true)
+            await startEgressIfNeeded()
+            startStatusPolling()
+            startControlRefresh()
+        } catch {
+            phase = .failed(error.localizedDescription)
+            setKeepAwake(false)
+        }
+        reconnecting = false
+    }
+
     public func toggleCamera() {
         cameraOn.toggle()
+        if cameraOn {
+            cameraPausedForBackground = false
+        }
         meeting.setCameraEnabled(cameraOn)
     }
 
@@ -308,15 +395,15 @@ public final class StudioRoomModel: ObservableObject {
     }
 
     public func grantStage(_ request: StudioStageRequest) {
-        meeting.grantStage(id: request.userId.isEmpty ? request.peerId : request.userId)
+        meeting.grantStage(id: request.stageId)
     }
 
     public func denyStage(_ request: StudioStageRequest) {
-        meeting.denyStage(id: request.userId.isEmpty ? request.peerId : request.userId)
+        meeting.denyStage(id: request.stageId)
     }
 
     public func bringOnAir(_ participant: StudioParticipant) {
-        meeting.grantStage(id: participant.userId ?? participant.id)
+        meeting.grantStage(id: participant.stageId)
     }
 
     public func takeOffStage(_ participant: StudioParticipant) {
@@ -324,7 +411,7 @@ public final class StudioRoomModel: ObservableObject {
             pushToast("Can't take the last person off air while live", kind: .warning)
             return
         }
-        meeting.takeOffStage(id: participant.userId ?? participant.id)
+        meeting.takeOffStage(id: participant.stageId)
         pendingConfirm = nil
     }
 
@@ -368,7 +455,12 @@ public final class StudioRoomModel: ObservableObject {
     }
 
     public func videoView(for tile: StudioDisplayTile) -> UIView? {
-        meeting.videoView(for: tile.participant.id, screenShare: tile.kind == .screen)
+        guard tile.kind != .idle else { return nil }
+        let view = meeting.videoView(for: tile.participant.id, screenShare: tile.kind == .screen)
+        if view == nil {
+            scheduleRendererRetry()
+        }
+        return view
     }
 
     public func videoView(for participant: StudioParticipant, screenShare: Bool = false) -> UIView? {
@@ -453,7 +545,117 @@ public final class StudioRoomModel: ObservableObject {
         let keys = [participant.userId, participant.id].compactMap { $0 }.filter { !$0.isEmpty }
         guard keys.contains(where: { pendingPanelists.contains($0) }) else { return }
         keys.forEach { pendingPanelists.remove($0) }
-        meeting.grantStage(id: participant.userId ?? participant.id)
+        meeting.grantStage(id: participant.stageId)
+        scheduleGrantVerify(participant)
+    }
+
+    private func scheduleGrantVerify(_ participant: StudioParticipant) {
+        let key = participant.stageId
+        grantVerifyTasks[key]?.cancel()
+        grantVerifyTasks[key] = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(4))
+            guard let self, !Task.isCancelled else { return }
+            let match = self.participants.first {
+                $0.id == participant.id || $0.stageId == participant.stageId
+            }
+            guard let match, !StudioStageLayout.isOnStage(match.stageStatus) else { return }
+            self.meeting.grantStage(id: match.stageId)
+        }
+    }
+
+    private func startJoinStageWatchdog() {
+        joinStageWatchdog?.cancel()
+        joinStageWatchdog = Task { [weak self] in
+            for _ in 0 ..< 30 {
+                try? await Task.sleep(for: .seconds(1))
+                guard let self, !Task.isCancelled else { return }
+                guard self.selfStageStatus == .acceptedToJoinStage else { return }
+                self.meeting.joinStage()
+            }
+            guard let self, !Task.isCancelled else { return }
+            if self.selfStageStatus == .acceptedToJoinStage {
+                self.pushToast("Couldn't join the stage automatically. Tap Joining stage to retry.", kind: .warning)
+            }
+        }
+    }
+
+    private func stopJoinStageWatchdog() {
+        joinStageWatchdog?.cancel()
+        joinStageWatchdog = nil
+    }
+
+    private func beginBackgroundTaskIfNeeded() {
+        guard backgroundTaskId == nil else { return }
+        let id = backgroundTasks.begin("livo.studio") { [weak self] in
+            Task { @MainActor in
+                self?.backgroundTaskId = nil
+            }
+        }
+        backgroundTaskId = id
+    }
+
+    private func endBackgroundTask() {
+        guard let id = backgroundTaskId else { return }
+        backgroundTaskId = nil
+        backgroundTasks.end(id)
+    }
+
+    private func recoverSignalingIfNeeded() async {
+        switch meeting.signalingState {
+        case .connected:
+            return
+        case .failed:
+            pushToast("Reconnecting…", kind: .warning)
+            await reconnect()
+        case .reconnecting, .disconnected:
+            signalingGraceTask?.cancel()
+            signalingGraceTask = Task { [weak self] in
+                guard let self else { return }
+                for _ in 0 ..< self.signalingGraceAttempts {
+                    try? await Task.sleep(for: self.signalingGraceInterval)
+                    guard !Task.isCancelled, self.phase == .inRoom else { return }
+                    switch self.meeting.signalingState {
+                    case .connected:
+                        return
+                    case .failed:
+                        self.pushToast("Reconnecting…", kind: .warning)
+                        await self.reconnect()
+                        return
+                    case .reconnecting, .disconnected:
+                        continue
+                    }
+                }
+                guard !Task.isCancelled, self.phase == .inRoom else { return }
+                if self.meeting.signalingState != .connected {
+                    self.pushToast("Reconnecting…", kind: .warning)
+                    await self.reconnect()
+                }
+            }
+            await signalingGraceTask?.value
+        }
+    }
+
+    private func scheduleRendererRetry() {
+        guard rendererRetryTask == nil else { return }
+        rendererRetryTask = Task { [weak self] in
+            guard let self else { return }
+            for _ in 0 ..< self.rendererRetryLimit {
+                try? await Task.sleep(for: self.rendererRetryDelay)
+                guard !Task.isCancelled else { return }
+                guard self.hasPendingRenderers() else {
+                    self.rendererRetryTask = nil
+                    return
+                }
+                self.rendererRevision += 1
+            }
+            self.rendererRetryTask = nil
+        }
+    }
+
+    private func hasPendingRenderers() -> Bool {
+        StudioStageLayout.expand(stageParticipants).contains { tile in
+            tile.kind != .idle && meeting.videoView(for: tile.participant.id, screenShare: tile.kind == .screen) == nil
+        }
     }
 
     private func showHostTileHintIfNeeded() {
@@ -467,7 +669,16 @@ public final class StudioRoomModel: ObservableObject {
         refreshTask?.cancel()
         toastTasks.values.forEach { $0.cancel() }
         toastTasks.removeAll()
+        grantVerifyTasks.values.forEach { $0.cancel() }
+        grantVerifyTasks.removeAll()
+        stopJoinStageWatchdog()
+        signalingGraceTask?.cancel()
+        signalingGraceTask = nil
+        rendererRetryTask?.cancel()
+        rendererRetryTask = nil
+        endBackgroundTask()
         setKeepAwake(false)
+        StudioAudioSession.relinquish()
     }
 
     private func startEgressIfNeeded() async {
@@ -552,6 +763,8 @@ extension StudioRoomModel: MeetingControllerDelegate {
     }
 
     public func meetingDidDisconnect(reason: MeetingDisconnectReason) {
+        guard !reconnecting else { return }
+        guard !phase.isTerminal else { return }
         switch reason {
         case .left:
             phase = .left
@@ -573,6 +786,9 @@ extension StudioRoomModel: MeetingControllerDelegate {
         }
         if !pendingPanelists.isEmpty {
             participants.forEach(takeAndGrant)
+        }
+        if hasPendingRenderers() {
+            scheduleRendererRetry()
         }
     }
 
@@ -618,7 +834,7 @@ extension StudioRoomModel: MeetingControllerDelegate {
     }
 
     public func meetingMediaDidChange(cameraOn: Bool, micOn: Bool, screenShareOn: Bool) {
-        if self.cameraOn != cameraOn { self.cameraOn = cameraOn }
+        if !cameraPausedForBackground, self.cameraOn != cameraOn { self.cameraOn = cameraOn }
         if self.micOn != micOn { self.micOn = micOn }
         if self.screenShareOn != screenShareOn { self.screenShareOn = screenShareOn }
     }
@@ -631,6 +847,12 @@ extension StudioRoomModel: MeetingControllerDelegate {
         let previous = selfStageStatus
         guard previous != status else { return }
         selfStageStatus = status
+        if status == .acceptedToJoinStage {
+            meeting.joinStage()
+            startJoinStageWatchdog()
+        } else {
+            stopJoinStageWatchdog()
+        }
         guard !isModerator else { return }
         if previous == .requestedToJoinStage {
             if status == .acceptedToJoinStage || status == .onStage {
@@ -661,6 +883,10 @@ extension StudioRoomModel: MeetingControllerDelegate {
         screenShareOn = false
         let trimmed = reason.trimmingCharacters(in: .whitespacesAndNewlines)
         presentStatus(trimmed.isEmpty ? "Screen share could not start" : trimmed)
+    }
+
+    public func meetingDidWarn(_ message: String) {
+        pushToast(message, kind: .warning)
     }
 
     public func meetingDidUpdateDevices() {

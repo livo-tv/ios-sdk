@@ -1,5 +1,6 @@
 import LivoStudioAPI
 import SwiftUI
+import UIKit
 
 /// Native studio room. First-party apps inject a minted `StudioSession`;
 /// partners should prefer `LivoHostStudioView` / `LivoGuestStudioView`.
@@ -7,6 +8,9 @@ public struct StudioRoomView: View {
     @Environment(\.studioTheme) private var theme
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var model: StudioRoomModel
 
     public init(
@@ -56,8 +60,31 @@ public struct StudioRoomView: View {
         .modifier(StudioPreferredColorScheme(mode: theme.mode))
         .task { await model.start() }
         .onDisappear { model.tearDown() }
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .background:
+                model.handleSceneBackgrounded()
+            case .active:
+                Task { await model.handleSceneBecameActive() }
+            case .inactive:
+                break
+            @unknown default:
+                break
+            }
+        }
         .sheet(isPresented: $model.showingSettings) {
             StudioSettingsSheet(model: model)
+        }
+        .sheet(isPresented: $model.showingMore) {
+            StudioMoreDrawer(model: model)
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: sidePanelPresented) {
+            StudioSidePanel(model: model)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackgroundInteraction(.enabled(upThrough: .medium))
         }
         .confirmationDialog(
             "Stop this broadcast?",
@@ -89,27 +116,56 @@ public struct StudioRoomView: View {
         }
     }
 
-    private var regularWidth: Bool { horizontalSizeClass == .regular }
+    private var usesPadChrome: Bool {
+        StudioStageLayout.prefersRegularLayout(
+            regularWidth: horizontalSizeClass == .regular,
+            regularHeight: verticalSizeClass == .regular,
+            isPad: UIDevice.current.userInterfaceIdiom == .pad
+        )
+    }
+
+    private var sidePanelPresented: Binding<Bool> {
+        Binding(
+            get: { model.phase == .inRoom && model.selectedTab != nil },
+            set: { if !$0 { model.selectedTab = nil } }
+        )
+    }
 
     private var room: some View {
-        VStack(spacing: 0) {
-            StudioHeaderBar(model: model)
-            if regularWidth {
-                HStack(spacing: 0) {
-                    ParticipantGridView(model: model, regularWidth: true)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    StudioSidePanel(model: model, fillsHeight: true)
-                        .frame(width: 340)
+        ZStack {
+            theme.background.ignoresSafeArea()
+            ParticipantGridView(model: model, regularWidth: usesPadChrome)
+                .padding(8)
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    Color.clear.frame(height: 56)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ParticipantGridView(model: model, regularWidth: false)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                StudioSidePanel(model: model, fillsHeight: false)
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    Color.clear.frame(height: 76)
+                }
+            VStack(spacing: 0) {
+                StudioHeaderBar(model: model)
+                Spacer(minLength: 0)
             }
-            StudioToolbar(model: model)
+            VStack {
+                Spacer(minLength: 0)
+                HStack(alignment: .bottom) {
+                    StudioChatOverlay(model: model)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 88)
+                .safeAreaPadding(.bottom)
+            }
+            if let pip = model.stageArrangement.pip {
+                StudioSelfPiPView(model: model, tile: pip)
+            }
+            VStack {
+                Spacer(minLength: 0)
+                StudioToolbar(model: model)
+            }
         }
         .foregroundStyle(theme.foreground)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: model.selectedTab)
     }
 
     private var confirmTitle: String {
@@ -165,7 +221,18 @@ public struct StudioRoomView: View {
                 .font(.body)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(theme.foreground)
-            if model.phase.isTerminal {
+            if case .failed = model.phase {
+                Button("Reconnect") {
+                    Task { await model.reconnect() }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(theme.primary)
+                Button("Close") {
+                    model.dismissRoom()
+                    dismiss()
+                }
+                .buttonStyle(.bordered)
+            } else if model.phase.isTerminal {
                 Button("Close") {
                     model.dismissRoom()
                     dismiss()
