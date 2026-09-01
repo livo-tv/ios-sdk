@@ -84,7 +84,6 @@ public struct StudioRoomView: View {
             StudioSidePanel(model: model)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
-                .presentationBackgroundInteraction(.enabled(upThrough: .medium))
         }
         .confirmationDialog(
             "Stop this broadcast?",

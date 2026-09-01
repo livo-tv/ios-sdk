@@ -10,8 +10,18 @@ enum StudioAudioSession {
         try? session.setCategory(
             .playAndRecord,
             mode: .videoChat,
-            options: [.allowBluetoothHFP, .defaultToSpeaker]
+            options: [Self.bluetoothHandsFree, .defaultToSpeaker]
         )
+    }
+
+    /// Hands-free Bluetooth. iOS 26 renamed `allowBluetooth` → `allowBluetoothHFP`;
+    /// CI still compiles against Xcode 16.4 / the iOS 18.5 SDK.
+    private static var bluetoothHandsFree: AVAudioSession.CategoryOptions {
+        #if compiler(>=6.2)
+        .allowBluetoothHFP
+        #else
+        .allowBluetooth
+        #endif
     }
 
     static func relinquish() {

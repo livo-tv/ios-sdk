@@ -38,14 +38,17 @@ struct StudioHeaderBar: View {
                         Text(model.publishing ? "Going live" : "Go Live")
                             .lineLimit(1)
                     }
-                    .padding(.horizontal, 4)
-                    .frame(minHeight: 44)
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .foregroundStyle(.white)
+                    .background(theme.live, in: Capsule())
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
+                .buttonStyle(.plain)
+                .frame(minHeight: 44)
                 .fixedSize()
-                .tint(theme.live)
                 .disabled(model.publishing)
+                .accessibilityLabel(model.publishing ? "Going live" : "Go Live")
             }
         }
         .padding(.horizontal, 16)

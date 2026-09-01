@@ -119,19 +119,35 @@ struct StudioChatPanel: View {
     }
 
     private var composer: some View {
-        HStack(alignment: .bottom) {
-            TextField("Message", text: $draft)
-                .textFieldStyle(.roundedBorder)
-                .submitLabel(.send)
-                .onSubmit { sendDraft() }
+        HStack(alignment: .bottom, spacing: 10) {
+            TextField("Message", text: $draft, axis: .vertical)
+                .textFieldStyle(.plain)
+                .font(.body)
+                .lineLimit(1 ... 5)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(theme.foreground.opacity(0.08), in: Capsule())
                 .onChange(of: draft) { _, next in
                     if next.count > StudioChatGrouping.maxTextLimit {
                         draft = String(next.prefix(StudioChatGrouping.maxTextLimit))
                     }
                 }
-            Button("Send") { sendDraft() }
-                .disabled(!canSend)
+            Button {
+                sendDraft()
+            } label: {
+                Image(systemName: "arrow.up")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(canSend ? theme.background : theme.secondary)
+                    .frame(width: 36, height: 36)
+                    .background(
+                        canSend ? theme.primary : theme.foreground.opacity(0.12),
+                        in: Circle()
+                    )
+            }
+            .disabled(!canSend)
+            .accessibilityLabel("Send")
         }
+        .padding(.top, 8)
     }
 
     private var canSend: Bool {
