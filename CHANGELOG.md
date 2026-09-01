@@ -1,3 +1,12 @@
+# [1.2.0](https://github.com/livo-tv/ios-sdk/compare/v1.1.0...v1.2.0) (2026-09-01)
+
+
+### Features
+
+* enhance audio session management and chat UI in Studio ([bff3280](https://github.com/livo-tv/ios-sdk/commit/bff3280c5c0d19a54b61870d7b3d264afba35653))
+* enhance RealtimeKit integration and background task management ([936e5d7](https://github.com/livo-tv/ios-sdk/commit/936e5d7ba44b956f467bb4504f2ee22a7640a5b1))
+* improve stage joining logic and error handling in RealtimeKit ([be47709](https://github.com/livo-tv/ios-sdk/commit/be47709534c9981cccf17fda48fee8f4e762d454))
+
 # [1.1.0](https://github.com/livo-tv/ios-sdk/compare/v1.0.0...v1.1.0) (2026-08-31)
 
 
