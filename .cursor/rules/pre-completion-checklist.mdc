@@ -20,5 +20,6 @@ alwaysApply: true
 3. Update `AGENTS.md` `## Learnings` / harness docs if you changed a durable fact or contract.
 4. Do **not** local-deploy. Local/desktop agents: do not commit/push unless the user asks. Cloud agents: commit and push with conventional commits.
 5. Background/cloud agents only: conventional commits per that repo's commitlint config.
+6. If the task changed user-visible or cross-service behavior: look up the area in `e2e/COVERAGE.md` and run `pnpm test:prod:verify --grep @<area>` (or add a spec / `required-missing` row in the same task). Never run `@live-media` unless the user asked.
 
 

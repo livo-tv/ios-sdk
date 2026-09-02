@@ -1,0 +1,41 @@
+---
+description: Verify user-visible and cross-service work with the matching e2e spec (or register a gap) before claiming done
+alwaysApply: true
+---
+
+# E2E verification
+
+If this task changed **user-visible or cross-service** behavior, verify it
+before claiming done. Pure-internal changes (types, docs, unit tests, comments)
+are exempt.
+
+## Do
+
+1. Look up the touched area in [`e2e/COVERAGE.md`](../../../e2e/COVERAGE.md)
+   (workspace) or this repo's Identity **E2E areas** row.
+2. If a spec exists, run the cheap prod verify for that tag:
+
+   ```bash
+   cd e2e
+   pnpm test:prod:verify --grep @<area>
+   ```
+
+   For UI review, `pnpm snap <customer|operator|guest> <url>` writes
+   `e2e/.snaps/`. `pnpm probe <METHOD> <path>` calls media-svc as a persona.
+3. If no spec exists, **in the same task** add one, or add a
+   `required-missing` row in `e2e/COVERAGE.md`. The task is not done otherwise.
+4. Treat a red verify as not done — fix the product or the spec, or report the
+   failure. Do not skip because "the list is small" or "dev is down".
+
+## Do not
+
+- Run `@live-media` (`pnpm test:live` / `E2E_LIVE_MEDIA=1`) unless the user
+  explicitly asked. That tier spawns Modal / transcodes / publishes.
+- Point `CF_API_TOKEN` at prod KV. Onboarding / licenses / partners skip on
+  prod until a dev stack ships.
+- Write outside org `e2e-customer` or scratch names `e2e-run-*`.
+- Toggle password-login on the persona accounts (`e2e_customer` /
+  `e2e_operator`) — that bricks the suite.
+
+Default agent environment is **prod cheap**. Dev hosts are 404 until a stack
+ships. `/verify-e2e` is the runbook.
