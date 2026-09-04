@@ -564,21 +564,29 @@ public final class StudioRoomModel: ObservableObject {
         }
     }
 
+    /// One watchdog retry. Tests call this directly so they do not wait on the 1s Task.
+    func performJoinStageWatchdogTick() {
+        guard selfStageStatus == .acceptedToJoinStage else { return }
+        meeting.joinStage()
+    }
+
     private func startJoinStageWatchdog() {
         joinStageWatchdog?.cancel()
         joinStageWatchdog = Task { [weak self] in
             for _ in 0 ..< 30 {
                 let interval = self?.joinStageWatchdogInterval ?? .seconds(1)
                 try? await Task.sleep(for: interval)
-                guard let self, !Task.isCancelled else { return }
-                guard self.selfStageStatus == .acceptedToJoinStage else { return }
-                self.meeting.joinStage()
+                guard !Task.isCancelled else { return }
+                await self?.performJoinStageWatchdogTick()
             }
-            guard let self, !Task.isCancelled else { return }
-            if self.selfStageStatus == .acceptedToJoinStage {
-                self.pushToast("Couldn't join the stage automatically. Tap Joining stage to retry.", kind: .warning)
-            }
+            guard !Task.isCancelled else { return }
+            await self?.finishJoinStageWatchdogIfStillAccepted()
         }
+    }
+
+    private func finishJoinStageWatchdogIfStillAccepted() {
+        guard selfStageStatus == .acceptedToJoinStage else { return }
+        pushToast("Couldn't join the stage automatically. Tap Joining stage to retry.", kind: .warning)
     }
 
     private func stopJoinStageWatchdog() {
