@@ -668,16 +668,19 @@ struct StudioRoomModelTests {
             role: .guest,
             stream: StudioStreamSummary(id: "stm", title: "Show", status: "preview")
         )
-        let model = StudioRoomModel(session: guest, meeting: meeting)
+        let model = StudioRoomModel(
+            session: guest,
+            apiURL: URL(string: "http://127.0.0.1:9")!,
+            meeting: meeting
+        )
         await model.start()
         model.meetingSelfStageDidChange(.acceptedToJoinStage)
         #expect(meeting.joinStageCount == 1)
-        try? await Task.sleep(for: .milliseconds(1800))
-        #expect(meeting.joinStageCount >= 2)
+        model.performJoinStageWatchdogTick()
+        #expect(meeting.joinStageCount == 2)
         model.meetingSelfStageDidChange(.onStage)
-        let after = meeting.joinStageCount
-        try? await Task.sleep(for: .milliseconds(1800))
-        #expect(meeting.joinStageCount == after)
+        model.performJoinStageWatchdogTick()
+        #expect(meeting.joinStageCount == 2)
         model.tearDown()
     }
 
