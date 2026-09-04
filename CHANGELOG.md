@@ -1,3 +1,10 @@
+## [1.3.1-rc.1](https://github.com/livo-tv/ios-sdk/compare/v1.3.0...v1.3.1-rc.1) (2026-09-04)
+
+
+### Bug Fixes
+
+* stabilize join-stage watchdog test on macos CI ([bb033fb](https://github.com/livo-tv/ios-sdk/commit/bb033fbd73e389968d70d06acd2062f6cd87962d))
+
 # [1.3.0](https://github.com/livo-tv/ios-sdk/compare/v1.2.0...v1.3.0) (2026-09-04)
 
 
