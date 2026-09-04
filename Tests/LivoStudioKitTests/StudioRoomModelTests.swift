@@ -129,6 +129,14 @@ struct StudioRoomModelTests {
         )
     }
 
+    private func waitUntil(timeout: Duration, _ predicate: () -> Bool) async {
+        let start = ContinuousClock.now
+        while !predicate() {
+            if ContinuousClock.now - start > timeout { return }
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+    }
+
     @Test func startJoinsAndExposesSelfTile() async {
         let meeting = MockMeetingController()
         let model = StudioRoomModel(session: session(), meeting: meeting)
@@ -669,14 +677,15 @@ struct StudioRoomModelTests {
             stream: StudioStreamSummary(id: "stm", title: "Show", status: "preview")
         )
         let model = StudioRoomModel(session: guest, meeting: meeting)
+        model.joinStageWatchdogInterval = .milliseconds(40)
         await model.start()
         model.meetingSelfStageDidChange(.acceptedToJoinStage)
         #expect(meeting.joinStageCount == 1)
-        try? await Task.sleep(for: .milliseconds(1800))
+        await waitUntil(timeout: .seconds(2)) { meeting.joinStageCount >= 2 }
         #expect(meeting.joinStageCount >= 2)
         model.meetingSelfStageDidChange(.onStage)
         let after = meeting.joinStageCount
-        try? await Task.sleep(for: .milliseconds(1800))
+        try? await Task.sleep(for: .milliseconds(120))
         #expect(meeting.joinStageCount == after)
         model.tearDown()
     }

@@ -1,0 +1,28 @@
+---
+description: Dev is the only path to main; fold main back into dev after every release
+alwaysApply: true
+---
+
+# Dev / main promote
+
+Applies to every `livo-tv` repo that has `dev` (not `harness`).
+
+## Do
+
+- Land product work (features, fixes, lockfiles, library pins) on **`dev`**
+- Reach `main` only by promoting dev (`dev` → `main` **merge commit**, never squash)
+- After `release.yml` on `main` (or a hotfix on `main`), merge **`main` back into dev**
+  - Fast-forward dev when dev has nothing new
+  - Otherwise a merge commit
+  - Wait for dev CI
+- Treat dev-behind (`chore(release): X.Y.Z` only on `main`) as a blocker for the next dev → `main` PR
+
+Runbook: `harness/platform/promote-dev-to-main.md` (`/promote`). ADR 0026.
+
+## Do not
+
+- Skip dev ← `main` after a stable cut because dev "already has the product work" — the release commit is new history on `main`. The next dev → `main` PR will conflict on `package.json` / CHANGELOG
+- Re-promote a dev-sync-only merge (that fold is not a second product path)
+- Open the same product change on dev and `main` in parallel
+- Promote dev while it is behind `main`
+- Force-push `main` or dev
