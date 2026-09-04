@@ -37,6 +37,15 @@ Inside a single-repo checkout (cloud agent / Bugbot), the fragments below are th
 - Never local-deploy Workers, Modal, TestFlight, or App Store from an agent (Workers Builds / CI owns deploy).
 - Local/desktop agents: do not commit or push unless the user asks. Cloud agents: commit and push with conventional commits so PRs/CI can run.
 - Never hand-bump package `version` — semantic-release owns it.
+- Repos with `dev`: land product work (including library pins) on dev.
+  `main` is reached only by promoting dev, except a rare hotfix. Do not
+  open the same change on dev and `main` in parallel. **After every
+  stable `chore(release)` or hotfix on `main`, merge `main` back into dev**
+  (fast-forward when dev has nothing new). Skipping that fold makes the
+  next dev → `main` PR conflict on `package.json` / CHANGELOG. Do not
+  re-promote a dev-sync-only merge. Runbook:
+  [`harness/platform/promote-dev-to-main.md`](../harness/platform/promote-dev-to-main.md)
+  (`/promote`). ADR 0026.
 - Prefer service-binding RPC between Workers; Bearer JWT for frontend→Worker (except auth-svc cookies).
 - English URL path segments only.
 - Update harness context when contracts/bindings change (`/update-context`).
@@ -50,6 +59,7 @@ Includes the harness itself, `@livo-tv/blocks`, `@livo-tv/sdk`, and `ios-sdk`.
 - `blocks/` and `sdk/` gates are `pnpm run ci:check` (format + lint + typecheck + test + build). Publish is semantic-release + npm OIDC — never `npm publish` from an agent.
 - `ios-sdk/` gate is `./scripts/ci-check.sh`. Publish is semantic-release git tags for SPM — never npm. `realtimekit-ios-core` is pinned `from: "3.1.0"` (not `branch: "main"`).
 - Never local-deploy. Local agents: no commit/push unless asked. Cloud agents: conventional commits.
+- After a stable release or hotfix on `main`, fold `main` back into dev (ADR 0026) so the next dev → `main` PR does not conflict on version files.
 
 # ios-sdk
 
@@ -63,6 +73,7 @@ Partner apps receive `hostToken` / `guestToken` from their backend (`POST /strea
 - Local/desktop agents: do not commit/push unless the user asks. Cloud agents: commit and push with conventional commits.
 - Never hand-bump `version` in package.json / pyproject.toml — semantic-release owns versions.
 - If you change a cross-service contract, binding, or durable fact: update `## Learnings` and the matching `harness/platform/` doc in the same task.
+- After a stable release or hotfix on `main`, merge `main` back into dev before the next dev → `main` PR (ADR 0026). Fast-forward when dev has nothing new. Do not re-promote a dev-sync-only merge.
 <!-- harness:end managed -->
 
 ## Learnings
