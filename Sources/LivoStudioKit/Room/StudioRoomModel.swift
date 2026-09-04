@@ -568,8 +568,8 @@ public final class StudioRoomModel: ObservableObject {
         joinStageWatchdog?.cancel()
         joinStageWatchdog = Task { [weak self] in
             for _ in 0 ..< 30 {
-                guard let self else { return }
-                try? await Task.sleep(for: self.joinStageWatchdogInterval)
+                let interval = self?.joinStageWatchdogInterval ?? .seconds(1)
+                try? await Task.sleep(for: interval)
                 guard let self, !Task.isCancelled else { return }
                 guard self.selfStageStatus == .acceptedToJoinStage else { return }
                 self.meeting.joinStage()
