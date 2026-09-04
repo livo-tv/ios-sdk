@@ -1,6 +1,6 @@
 {
 	"name": "@livo-tv/ios-sdk",
-	"version": "1.2.0",
+	"version": "1.3.0",
 	"private": true,
 	"description": "Livo native iOS studio SDK. Public Swift package through SPM.",
 	"repository": {
