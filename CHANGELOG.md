@@ -1,9 +1,12 @@
-# [1.3.0-rc.1](https://github.com/livo-tv/ios-sdk/compare/v1.2.0...v1.3.0-rc.1) (2026-09-04)
+# [1.3.0](https://github.com/livo-tv/ios-sdk/compare/v1.2.0...v1.3.0) (2026-09-04)
 
 
 ### Bug Fixes
 
-* stabilize join-stage watchdog test on macos CI ([bb033fb](https://github.com/livo-tv/ios-sdk/commit/bb033fbd73e389968d70d06acd2062f6cd87962d))
+* drive join-stage watchdog test via explicit tick ([4b4960f](https://github.com/livo-tv/ios-sdk/commit/4b4960faef316718744fec98e231be18581cb5af))
+* drive join-stage watchdog test via explicit tick ([6835b9c](https://github.com/livo-tv/ios-sdk/commit/6835b9c7a0bbd6099a55d0437c33bf5224ce1262))
+* stabilize join-stage watchdog test on macos CI ([5ed78bf](https://github.com/livo-tv/ios-sdk/commit/5ed78bf0eb0d81a74f7b6d871047d276ff405a0b))
+* unwrap join-stage watchdog self after sleep ([5efbdc2](https://github.com/livo-tv/ios-sdk/commit/5efbdc2c994f370a3fcb3dee5ccd3ce8baf65f73))
 
 
 ### Features
