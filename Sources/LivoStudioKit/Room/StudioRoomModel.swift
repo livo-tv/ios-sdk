@@ -117,6 +117,7 @@ public final class StudioRoomModel: ObservableObject {
     var signalingGraceAttempts = 20
     var rendererRetryDelay: Duration = .milliseconds(500)
     var rendererRetryLimit = 6
+    var joinStageWatchdogInterval: Duration = .seconds(1)
     static let hostTileHintKey = "livo.studio.hostTileHintShown"
 
     public var isModerator: Bool { session.role == .moderator }
@@ -567,7 +568,8 @@ public final class StudioRoomModel: ObservableObject {
         joinStageWatchdog?.cancel()
         joinStageWatchdog = Task { [weak self] in
             for _ in 0 ..< 30 {
-                try? await Task.sleep(for: .seconds(1))
+                guard let self else { return }
+                try? await Task.sleep(for: self.joinStageWatchdogInterval)
                 guard let self, !Task.isCancelled else { return }
                 guard self.selfStageStatus == .acceptedToJoinStage else { return }
                 self.meeting.joinStage()
