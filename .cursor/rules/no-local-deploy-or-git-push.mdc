@@ -5,12 +5,15 @@ alwaysApply: true
 
 # No local deploy; git depends on agent environment
 
-**Deploy** is always owned by CI (Cloudflare Workers Builds / Modal). **Git** depends on where the agent runs.
+**Deploy** is owned by CI: Cloudflare Workers Builds / Modal on prod and stable
+dev, plus GitHub Actions `preview-stack.yml` for **dev-account ephemeral
+backend stacks only** (ADR 0027). **Git** depends on where the agent runs.
 
 ## All agents — do not deploy from the agent environment
 
-- Do not run `wrangler deploy`, `pnpm deploy`, `deploy:dev`, `deploy:prod`, `versions:upload`, `modal deploy`, or any other local deploy/publish
+- Do not run `wrangler deploy`, `pnpm deploy`, `deploy:dev`, `deploy:prod`, `versions:upload`, `preview:upload`, `modal deploy`, or any other local deploy/publish
 - Do not work around deploy via `pnpm dlx wrangler@latest deploy` or Cloudflare write APIs that publish a Worker
+- Do not run `preview-stack.mjs up` from a laptop — that is the GitHub Action on the dev account
 - Tell the user when a change needs a deploy; they ship via the existing pipeline
 
 ## Local / desktop agents — do not commit or push

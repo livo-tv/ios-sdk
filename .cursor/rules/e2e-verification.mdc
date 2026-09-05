@@ -37,5 +37,6 @@ are exempt.
 - Toggle password-login on the persona accounts (`e2e_customer` /
   `e2e_operator`) — that bricks the suite.
 
-Default agent environment is **prod cheap**. Dev hosts are 404 until a stack
-ships. `/verify-e2e` is the runbook.
+Default agent environment is **prod cheap**. Dev hosts are 404 until
+`harness/platform/dev-stack-handoff.md` is done. Local stack:
+`pnpm --dir harness dev` then `E2E_ENV=local`. `/verify-e2e` is the runbook.
