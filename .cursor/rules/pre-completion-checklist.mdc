@@ -19,7 +19,8 @@ alwaysApply: true
 2. Run the **full** quality gate above (format/lint included — not just tests). Fix until green. Tests passing is not done; commit hooks reject ruff/prettier failures.
 3. Update `AGENTS.md` `## Learnings` / harness docs if you changed a durable fact or contract.
 4. Do **not** local-deploy. Local/desktop agents: do not commit/push unless the user asks. Cloud agents: commit and push with conventional commits.
-5. Background/cloud agents only: conventional commits per that repo's commitlint config.
-6. If the task changed user-visible or cross-service behavior: look up the area in `e2e/COVERAGE.md` and run `pnpm test:prod:verify --grep @<area>` (or add a spec / `required-missing` row in the same task). Never run `@live-media` unless the user asked.
+5. Background/cloud agents only: conventional commits per that repo's commitlint config. Branch from `origin/dev` and open the PR **into `dev`** (harness: `main` only) unless the user asked for a hotfix or `/promote`. That PR is what starts ADR 0027 previews — do not target `main` for feature work and do not add `no-preview` unless asked.
+6. Engineering output is English (ADR 0028): replies, code, comments, commits, PRs, docs. A Spanish prompt does not switch the session or the codebase. Locale catalogs may hold `es` / `pt` UI copy with English keys. Spanglish is a defect.
+7. If the task changed user-visible or cross-service behavior: look up the area in `e2e/COVERAGE.md` and run `pnpm test:prod:verify --grep @<area>` (or add a spec / `required-missing` row in the same task). Never run `@live-media` unless the user asked.
 
 

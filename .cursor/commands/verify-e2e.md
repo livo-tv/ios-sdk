@@ -16,6 +16,7 @@ Runbook for `/verify-e2e` after a user-visible or cross-service change.
 | -------------------- | -------------------------------- | -------------------------------------------------- |
 | Prod cheap (default) | Agent verification today         | `cd e2e && pnpm test:prod:verify --grep @<area>`   |
 | Prod smoke only      | No password secrets              | `cd e2e && pnpm test:prod`                         |
+| Preview (ADR 0027)   | PR into `dev` is open            | `cd e2e && pnpm test:preview --slug <slug>`        |
 | Live media           | User explicitly asked            | `cd e2e && pnpm test:live --grep @<area>`          |
 | Dev                  | Deployed `*.livo-tv.workers.dev` | `cd e2e && pnpm test:dev --grep @<area>`           |
 | Local                | `pnpm --dir harness dev` up      | `cd e2e && E2E_ENV=local pnpm test --grep @<area>` |

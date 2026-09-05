@@ -24,11 +24,15 @@ When running in Cursor Desktop (or any local workspace session):
 - Do not amend, rebase onto remote, or force-push
 - Leave staging, committing, and pushing to the user
 
-## Cloud agents — commit and push are expected
+## Cloud agents — commit, push, and open a PR into `dev`
 
 When running as a **cloud agent** (Background Agent, Cloud Agent, Bugbot fix agent, or similar remote VM checkout):
 
-- **Do** create conventional commits and push to the working branch so the work is reviewable and CI/Workers Builds can run
+- Start from **`origin/dev`** unless the user named another base (`main` / hotfix / `/promote`). `harness` has no `dev` — stay on `main`.
+- **Do** create conventional commits and push the working branch so the work is reviewable and CI can run
+- **Do** open a PR **into `dev`** (not `main`). Worker `preview.yml` and library `preview-publish.yml` only run on PRs targeting `dev`. That is the polyrepo preview system (ADR 0027) — use it; do not add label `no-preview` unless asked
 - Prefer small, focused commits; follow that repo's commitlint / conventional-commit config
-- Still **never** local-deploy — push and let Workers Builds / release workflows ship
-- Avoid force-push to `main`/`master`; do not skip hooks unless the user explicitly requires it
+- Still **never** local-deploy — do not run `preview:upload` or `preview-stack.mjs` from the agent. Workers Builds / `preview-stack.yml` ship the preview
+- After the PR is open, report the preview URLs. Slug: `node scripts/preview-slug.mjs <branch>` (or the harness copy). Frontends: `https://<slug>-<worker>.livo-tv.workers.dev`. Services: `https://<svc>-<slug>.livo-tv.workers.dev`. Optional e2e: `cd e2e && pnpm test:preview --slug <slug>`
+- iOS TestFlight public link: label the `ios-app` PR `ios-preview`
+- Avoid force-push to `main`/`master`/`dev`; do not skip hooks unless the user explicitly requires it
