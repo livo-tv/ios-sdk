@@ -12,14 +12,23 @@ Runbook for `/verify-e2e` after a user-visible or cross-service change.
 
 ## Environment matrix
 
-| Env                  | When                             | Command                                            |
-| -------------------- | -------------------------------- | -------------------------------------------------- |
-| Prod cheap (default) | Agent verification today         | `cd e2e && pnpm test:prod:verify --grep @<area>`   |
-| Prod smoke only      | No password secrets              | `cd e2e && pnpm test:prod`                         |
-| Preview (ADR 0027)   | PR into `dev` is open            | `cd e2e && pnpm test:preview --slug <slug>`        |
-| Live media           | User explicitly asked            | `cd e2e && pnpm test:live --grep @<area>`          |
-| Dev                  | Deployed `*.livo-tv.workers.dev` | `cd e2e && pnpm test:dev --grep @<area>`           |
-| Local                | `pnpm --dir harness dev` up      | `cd e2e && E2E_ENV=local pnpm test --grep @<area>` |
+| Env                | When                                                                 | Command                                            |
+| ------------------ | -------------------------------------------------------------------- | -------------------------------------------------- |
+| Preview (ADR 0027) | PR into `dev` is open — preferred for UI/journey on the unmerged SHA | `cd e2e && pnpm test:preview --slug <slug>`        |
+| Prod cheap         | No open preview, or after the change is on prod                      | `cd e2e && pnpm test:prod:verify --grep @<area>`   |
+| Prod smoke only    | No password secrets                                                  | `cd e2e && pnpm test:prod`                         |
+| Live media         | User explicitly asked                                                | `cd e2e && pnpm test:live --grep @<area>`          |
+| Dev                | Deployed `*.livo-tv.workers.dev`                                     | `cd e2e && pnpm test:dev --grep @<area>`           |
+| Local              | `pnpm --dir harness dev` up                                          | `cd e2e && E2E_ENV=local pnpm test --grep @<area>` |
+
+When a PR into `dev` is open, wait for the `<!-- livo-preview-stack -->`
+comment (`/healthz` ok). For an `auth-svc` stack, confirm
+`GET {auth-svc-stack}/api/auth/login-method?email=e2e_operator@livo.tv`
+returns `{ method: "password" }`, then sign in on
+`https://<slug>-auth.livo-tv.workers.dev/login` with Cursor Cloud password
+secrets (clean browser profile — cookies share `.livo-tv.workers.dev` with
+stable-dev). Passkeys / Google / OTP do not work on preview aliases. Prod
+cheap cannot validate the unmerged branch.
 
 Dev hosts are 404 until `harness/platform/dev-stack-handoff.md` is done. Local
 OTP uses wrangler `--local` KV (no `CF_API_TOKEN`). `pnpm probe:hls <url>`
