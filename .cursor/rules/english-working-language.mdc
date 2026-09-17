@@ -1,0 +1,39 @@
+---
+description: English is the only engineering language; prompts may be in any language
+alwaysApply: true
+---
+
+# English working language
+
+Engineering output is **English only**. A Spanish-speaking (or mixed-language)
+prompt does not change that. Livo's audience being largely Mexican Spanish
+does **not** justify Spanish or Spanglish in code, comments, docs, or chat.
+
+Why: English is the shared language for every SWE; translating the same
+facts back and forth wastes tokens.
+
+## Do
+
+- Reply in **English**, even when the human writes Spanish (or any other
+  language), unless they **explicitly** ask for a reply in another language
+- Identifiers, comments, commit messages, PR titles/bodies, ADRs, AGENTS.md,
+  harness docs, OpenAPI descriptions, test names, log/error **codes**: English
+- Product UI copy that must be localized belongs in locale catalogs
+  (`messages/es.json`, `pt.json`, iOS `Localizable`, Mandrill templates) with
+  **English keys**. Route paths stay English (see `english-route-paths.mdc`)
+- Understand a non-English prompt; implement in English. Do not paste the
+  prompt's Spanish into the repo
+
+## Do not
+
+- Spanglish, mixed-language comments, Spanish identifiers (`usuario`,
+  `organizacion`, `transmision`), or Spanish markdown in the codebase
+- Switch the conversation to Spanish (or stay there) just because the prompt
+  was in Spanish
+- Write customer-facing Spanish into TypeScript/Python/Swift **source** —
+  put it in the locale file
+- Translate existing English docs or comments into Spanish "for the team"
+
+A request for Spanish **chat** still produces English **code and docs**.
+A request to add UI copy in `es` still uses English keys and English routes.
+ADR 0028.

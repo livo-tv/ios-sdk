@@ -13,13 +13,17 @@ are exempt.
 
 1. Look up the touched area in [`e2e/COVERAGE.md`](../../../e2e/COVERAGE.md)
    (workspace) or this repo's Identity **E2E areas** row.
-2. If a spec exists, run the cheap prod verify for that tag:
+2. If a spec exists, verify the matching tag. When a PR into `dev` is
+   open, prefer the preview stack after the `<!-- livo-preview-stack -->`
+   comment is healthy and `login-method` is `password` for the personas:
 
    ```bash
    cd e2e
-   pnpm test:prod:verify --grep @<area>
+   pnpm test:preview --slug <slug>
    ```
 
+   Prod cheap (`pnpm test:prod:verify --grep @<area>`) cannot validate the
+   unmerged branch. Use it when there is no open preview, or after promote.
    For UI review, `pnpm snap <customer|operator|guest> <url>` writes
    `e2e/.snaps/`. `pnpm probe <METHOD> <path>` calls media-svc as a persona.
 3. If no spec exists, **in the same task** add one, or add a
@@ -37,5 +41,13 @@ are exempt.
 - Toggle password-login on the persona accounts (`e2e_customer` /
   `e2e_operator`) — that bricks the suite.
 
-Default agent environment is **prod cheap**. Dev hosts are 404 until a stack
-ships. `/verify-e2e` is the runbook.
+When a cloud agent already opened a PR **into `dev`**, UI and journey checks
+prefer the preview alias after the stack comment is healthy:
+`pnpm snap` against `https://<slug>-<app>.livo-tv.workers.dev` and
+`cd e2e && pnpm test:preview --slug <slug>`. Confirm
+`GET {auth-svc-stack}/api/auth/login-method?email=e2e_operator@livo.tv` is
+`{ method: "password" }` before signing in. Prod cheap cannot validate the
+unmerged branch. Preview stacks skip when the PR has label `no-preview`.
+Dev hosts are 404 until `harness/platform/dev-stack-handoff.md` is done.
+Local stack: `pnpm --dir harness dev` then `E2E_ENV=local`. `/verify-e2e`
+is the runbook.

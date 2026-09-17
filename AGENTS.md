@@ -33,9 +33,9 @@ Inside a single-repo checkout (cloud agent / Bugbot), the fragments below are th
 
 ## Shared platform rules
 
-- Multi-repo under GitHub org `livo-tv`; **two Cloudflare accounts** (Dev + Prod) — see harness ADR 0001; deploy via Workers Builds on push (not GHA, except media-engine → Modal and ios-app → TestFlight on `main`).
-- Never local-deploy Workers, Modal, TestFlight, or App Store from an agent (Workers Builds / CI owns deploy).
-- Local/desktop agents: do not commit or push unless the user asks. Cloud agents: commit and push with conventional commits so PRs/CI can run.
+- Multi-repo under GitHub org `livo-tv`; **two Cloudflare accounts** (Dev + Prod) — see harness ADR 0001; deploy via Workers Builds on push (not GHA, except media-engine → Modal, ios-app → TestFlight on `main`, and android-app → Google Play).
+- Never local-deploy Workers, Modal, TestFlight, App Store, Play, or Maven Central from an agent (Workers Builds / CI owns deploy).
+- Local/desktop agents: do not commit or push unless the user asks. Cloud agents: commit and push with conventional commits so PRs/CI can run. Unless the user names `main`, a hotfix, or `/promote`, branch from `origin/dev` and open the PR **into `dev`** so ADR 0027 previews run (`https://<slug>-<worker>.livo-tv.workers.dev` / `https://<svc>-<slug>.livo-tv.workers.dev`). `harness` has no `dev` — stay on `main`. Do not run `preview:upload` / `preview-stack.mjs` from the agent.
 - Never hand-bump package `version` — semantic-release owns it.
 - Repos with `dev`: land product work (including library pins) on dev.
   `main` is reached only by promoting dev, except a rare hotfix. Do not
@@ -47,17 +47,21 @@ Inside a single-repo checkout (cloud agent / Bugbot), the fragments below are th
   [`harness/platform/promote-dev-to-main.md`](../harness/platform/promote-dev-to-main.md)
   (`/promote`). ADR 0026.
 - Prefer service-binding RPC between Workers; Bearer JWT for frontend→Worker (except auth-svc cookies).
-- English URL path segments only.
+- English URL path segments only. Engineering language is English (code,
+  comments, commits, PRs, docs, agent replies) even when the prompt is
+  Spanish — ADR 0028. Locale catalogs may hold `es` / `pt` UI copy with
+  English keys. Spanglish in source or docs is a defect.
 - Update harness context when contracts/bindings change (`/update-context`).
 
 ## Library / non-Worker class
 
-Includes the harness itself, `@livo-tv/blocks`, `@livo-tv/sdk`, and `ios-sdk`.
+Includes the harness itself, `@livo-tv/blocks`, `@livo-tv/sdk`, `ios-sdk`, and `android-sdk`.
 
 - Run the quality gate listed in this repo's Identity / Quality gate section.
 - `harness/` gate is `pnpm run ci:check` (format + `check.mjs --repo-only`). Husky pre-commit runs the same script as GitHub CI.
 - `blocks/` and `sdk/` gates are `pnpm run ci:check` (format + lint + typecheck + test + build). Publish is semantic-release + npm OIDC — never `npm publish` from an agent.
 - `ios-sdk/` gate is `./scripts/ci-check.sh`. Publish is semantic-release git tags for SPM — never npm. `realtimekit-ios-core` is pinned `from: "3.1.0"` (not `branch: "main"`).
+- `android-sdk/` gate is `./scripts/ci-check.sh`. Publish is semantic-release + Maven Central (`tv.livo`) — never `publishToMavenCentral` from a laptop. RealtimeKit Core is a host-app dependency (`com.cloudflare.realtimekit:core-android:3.1.0`).
 - Never local-deploy. Local agents: no commit/push unless asked. Cloud agents: conventional commits.
 - After a stable release or hotfix on `main`, fold `main` back into dev (ADR 0026) so the next dev → `main` PR does not conflict on version files.
 
@@ -70,10 +74,11 @@ Partner apps receive `hostToken` / `guestToken` from their backend (`POST /strea
 ## Hard rules
 
 - Never local `wrangler deploy` / `pnpm deploy*` / `modal deploy` — CI owns deploy.
-- Local/desktop agents: do not commit/push unless the user asks. Cloud agents: commit and push with conventional commits.
+- Local/desktop agents: do not commit/push unless the user asks. Cloud agents: commit and push with conventional commits. Branch from `origin/dev` and open the PR into `dev` (harness: `main` only) unless the user asked for a hotfix or `/promote`. That PR starts ADR 0027 previews.
 - Never hand-bump `version` in package.json / pyproject.toml — semantic-release owns versions.
 - If you change a cross-service contract, binding, or durable fact: update `## Learnings` and the matching `harness/platform/` doc in the same task.
 - After a stable release or hotfix on `main`, merge `main` back into dev before the next dev → `main` PR (ADR 0026). Fast-forward when dev has nothing new. Do not re-promote a dev-sync-only merge.
+- Engineering language is English (ADR 0028). Prompts may be any language; replies, code, comments, commits, PRs, and docs stay English unless the user explicitly asks for a chat reply in another language. Spanglish is a defect.
 <!-- harness:end managed -->
 
 ## Learnings
