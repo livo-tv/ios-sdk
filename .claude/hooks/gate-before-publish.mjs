@@ -8,11 +8,20 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { cacheKey, commandWorkdir, inspectShell, publishDecision } from "./policy.mjs";
+import {
+	cacheKey,
+	commandWorkdir,
+	inspectShell,
+	publishDecision,
+} from "./policy.mjs";
 import { allow, deny, readHookInput } from "./run.mjs";
 
 function git(cwd, args) {
-	const r = spawnSync("git", args, { cwd, encoding: "utf8", windowsHide: true });
+	const r = spawnSync("git", args, {
+		cwd,
+		encoding: "utf8",
+		windowsHide: true,
+	});
 	if (r.status !== 0) return "";
 	return r.stdout || "";
 }
@@ -42,7 +51,8 @@ export async function main() {
 	const diff = `${git(cwd, ["diff"])}${git(cwd, ["diff", "--cached"])}`;
 	const key = cacheKey(head, porcelain, diff);
 	const stamp = resolve(cwd, ".git", "livo-gate-ok");
-	const cacheHit = existsSync(stamp) && readFileSync(stamp, "utf8").trim() === key;
+	const cacheHit =
+		existsSync(stamp) && readFileSync(stamp, "utf8").trim() === key;
 	if (cacheHit || meta.mobileRemindOnly) {
 		const decision = publishDecision({
 			publish: true,
@@ -79,7 +89,10 @@ export async function main() {
 	}
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+if (
+	process.argv[1] &&
+	fileURLToPath(import.meta.url) === resolve(process.argv[1])
+) {
 	main().catch(() => {
 		process.stdout.write("{}");
 	});

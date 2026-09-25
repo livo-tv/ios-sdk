@@ -20,7 +20,10 @@ function chunksFor(input) {
 	if (Array.isArray(args.edits)) {
 		return {
 			filePath,
-			chunks: args.edits.map((e) => ({ old: e.old_string || "", neu: e.new_string || "" })),
+			chunks: args.edits.map((e) => ({
+				old: e.old_string || "",
+				neu: e.new_string || "",
+			})),
 		};
 	}
 	return {
@@ -37,7 +40,10 @@ export async function main() {
 	if (reason) deny(reason);
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+if (
+	process.argv[1] &&
+	fileURLToPath(import.meta.url) === resolve(process.argv[1])
+) {
 	main().catch(() => {
 		process.stdout.write("{}");
 	});

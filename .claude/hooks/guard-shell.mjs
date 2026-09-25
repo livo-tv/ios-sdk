@@ -7,11 +7,20 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { commandWorkdir, ghPrInvocation, inspectShell, prDecision } from "./policy.mjs";
+import {
+	commandWorkdir,
+	ghPrInvocation,
+	inspectShell,
+	prDecision,
+} from "./policy.mjs";
 import { deny, readHookInput } from "./run.mjs";
 
 function git(cwd, args) {
-	const r = spawnSync("git", args, { cwd, encoding: "utf8", windowsHide: true });
+	const r = spawnSync("git", args, {
+		cwd,
+		encoding: "utf8",
+		windowsHide: true,
+	});
 	if (r.status !== 0) return "";
 	return (r.stdout || "").trim();
 }
@@ -48,7 +57,10 @@ export async function main() {
 	const work = commandWorkdir(baseCwd, command);
 	const cwd = probed.dashC ? resolve(work, probed.dashC) : work;
 	const branch = git(cwd, ["rev-parse", "--abbrev-ref", "HEAD"]);
-	const shell = inspectShell(command, { currentBranch: branch, foldOk: isDevFold(cwd) });
+	const shell = inspectShell(command, {
+		currentBranch: branch,
+		foldOk: isDevFold(cwd),
+	});
 	if (shell.deny) deny(shell.deny);
 	const pr = ghPrInvocation(command);
 	if (!pr) return;
@@ -61,7 +73,10 @@ export async function main() {
 	if (reason) deny(reason);
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+if (
+	process.argv[1] &&
+	fileURLToPath(import.meta.url) === resolve(process.argv[1])
+) {
 	main().catch(() => {
 		process.stdout.write("{}");
 	});

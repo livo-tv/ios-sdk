@@ -30,8 +30,10 @@ export const CLAUDE_DENY = [
 ];
 
 const COMMAND_DESCRIPTIONS = {
-	"promote.md": "Promote dev into main with a merge commit, then fold main back",
-	"update-context.md": "Update AGENTS.md Learnings and harness docs after a durable change",
+	"promote.md":
+		"Promote dev into main with a merge commit, then fold main back",
+	"update-context.md":
+		"Update AGENTS.md Learnings and harness docs after a durable change",
 	"verify-e2e.md": "Run the e2e spec for the area this change touched",
 };
 
@@ -56,7 +58,10 @@ export function claudeSettings() {
 			PreToolUse: [
 				{
 					matcher: "Bash",
-					hooks: [node("guard-shell.mjs", 30), node("gate-before-publish.mjs", 600)],
+					hooks: [
+						node("guard-shell.mjs", 30),
+						node("gate-before-publish.mjs", 600),
+					],
 				},
 				{
 					matcher: "Edit|Write",
@@ -187,7 +192,13 @@ function normalizeRef(spec, currentBranch) {
 }
 
 function pushPlan(args, currentBranch) {
-	const valued = new Set(["-o", "--push-option", "--receive-pack", "--exec", "--repo"]);
+	const valued = new Set([
+		"-o",
+		"--push-option",
+		"--receive-pack",
+		"--exec",
+		"--repo",
+	]);
 	const positionals = [];
 	let force = false;
 	let all = false;
@@ -237,7 +248,11 @@ function pushPlan(args, currentBranch) {
 
 function isDeploy(tokens) {
 	const [a, b, c] = tokens;
-	if (a === "wrangler" && (b === "deploy" || (b === "versions" && c === "upload"))) return true;
+	if (
+		a === "wrangler" &&
+		(b === "deploy" || (b === "versions" && c === "upload"))
+	)
+		return true;
 	if (a === "npx" && tokens.includes("wrangler")) {
 		if (tokens.includes("deploy")) return true;
 		const v = tokens.indexOf("versions");
@@ -245,19 +260,31 @@ function isDeploy(tokens) {
 	}
 	if ((a === "pnpm" || a === "npm") && b === "publish") return true;
 	if (a === "pnpm" && b === "deploy") return true;
-	if (a === "pnpm" && b === "run" && (c === "deploy" || c === "deploy:dev" || c === "deploy:prod"))
+	if (
+		a === "pnpm" &&
+		b === "run" &&
+		(c === "deploy" || c === "deploy:dev" || c === "deploy:prod")
+	)
 		return true;
 	if (a === "pnpm" && b === "run" && c === "preview:upload") return true;
 	if (a === "modal" && b === "deploy") return true;
 	if (tokens.some((t) => t.includes("publishToMavenCentral"))) return true;
-	if (tokens.some((t) => t.endsWith("preview-stack.mjs") || t.endsWith("preview-upload.mjs")))
+	if (
+		tokens.some(
+			(t) =>
+				t.endsWith("preview-stack.mjs") || t.endsWith("preview-upload.mjs"),
+		)
+	)
 		return true;
-	if ((a === "npm" || a === "pnpm" || a === "yarn") && b === "version") return true;
+	if ((a === "npm" || a === "pnpm" || a === "yarn") && b === "version")
+		return true;
 	return false;
 }
 
 function commitSkipsHooks(args) {
-	return args.some((a) => a === "--no-verify" || a === "-n" || /^-[^-]*n[^-]*$/.test(a));
+	return args.some(
+		(a) => a === "--no-verify" || a === "-n" || /^-[^-]*n[^-]*$/.test(a),
+	);
 }
 
 /**
@@ -282,7 +309,8 @@ export function inspectShell(command, ctx = {}) {
 		const tokens = tokenize(segment);
 		if (!tokens.length) continue;
 		if (tokens.join(" ").includes("core.hooksPath")) {
-			deny = "Do not change core.hooksPath. Husky (or media-engine .githooks) must stay installed.";
+			deny =
+				"Do not change core.hooksPath. Husky (or media-engine .githooks) must stay installed.";
 		}
 		if (isDeploy(tokens)) {
 			deny =
@@ -291,13 +319,16 @@ export function inspectShell(command, ctx = {}) {
 		const git = gitInvocation(tokens);
 		if (git?.dashC) dashC = git.dashC;
 		if (git?.sub === "commit" && commitSkipsHooks(git.args)) {
-			deny = "Do not skip commit hooks (--no-verify). Fix the commit message or the gate.";
+			deny =
+				"Do not skip commit hooks (--no-verify). Fix the commit message or the gate.";
 		}
 		if (git?.sub === "push") {
 			const plan = pushPlan(git.args, ctx.currentBranch);
 			const protectedDest = plan.dests.filter((d) => PROTECTED_BRANCHES.has(d));
 			const onlyDevFold =
-				ctx.foldOk && protectedDest.length > 0 && protectedDest.every((d) => d === "dev");
+				ctx.foldOk &&
+				protectedDest.length > 0 &&
+				protectedDest.every((d) => d === "dev");
 			if (plan.force) deny = "Do not force-push.";
 			else if (plan.all || (protectedDest.length > 0 && !onlyDevFold)) {
 				deny =
@@ -349,15 +380,18 @@ export function prDecision({ action, base, head, hasDev }) {
 	const hotfix = /^hotfix[/-]/.test(head || "");
 	const promote = head === "dev";
 	if (!hasDev) {
-		if (base && base !== "main") return "This repo has no dev branch. Open the PR into main.";
+		if (base && base !== "main")
+			return "This repo has no dev branch. Open the PR into main.";
 		return null;
 	}
 	if (promote) {
-		if (base !== "main") return "A promote PR (head dev) must pass --base main.";
+		if (base !== "main")
+			return "A promote PR (head dev) must pass --base main.";
 		return null;
 	}
 	if (hotfix) {
-		if (base !== "main") return "A hotfix PR must use a hotfix/* branch and --base main.";
+		if (base !== "main")
+			return "A hotfix PR must use a hotfix/* branch and --base main.";
 		return null;
 	}
 	if (base !== "dev") {
@@ -375,7 +409,9 @@ const VERSION_RES = [
 ];
 
 function versionFingerprints(text) {
-	return VERSION_RES.map((re) => (String(text).match(re) || [])[0] || "").join("\n");
+	return VERSION_RES.map((re) => (String(text).match(re) || [])[0] || "").join(
+		"\n",
+	);
 }
 
 export function versionEditDenied(filePath, oldText, newText) {
@@ -392,7 +428,8 @@ export function versionEditDenied(filePath, oldText, newText) {
 		try {
 			const a = JSON.parse(oldText);
 			const b = JSON.parse(newText);
-			if (a && b && typeof a.version === "string" && a.version !== b.version) return true;
+			if (a && b && typeof a.version === "string" && a.version !== b.version)
+				return true;
 			if (a && b && typeof a.version === "string") return false;
 		} catch {
 			/* snippet, fall through */
@@ -407,7 +444,8 @@ export function versionEditDenied(filePath, oldText, newText) {
 export function isGeneratedAgentPath(filePath) {
 	const p = String(filePath || "").replace(/\\/g, "/");
 	if (/\/\.cursor\/(rules|commands|hooks)(\/|$)/.test(p)) return true;
-	if (p.endsWith("/.cursor/hooks.json") || p.endsWith("/.cursor/hooks.jsonc")) return true;
+	if (p.endsWith("/.cursor/hooks.json") || p.endsWith("/.cursor/hooks.jsonc"))
+		return true;
 	if (/\/\.claude\//.test(p)) return true;
 	if (/(^|\/)CLAUDE\.md$/.test(p)) return true;
 	return false;
@@ -415,7 +453,10 @@ export function isGeneratedAgentPath(filePath) {
 
 export function touchesManagedBlock(oldText, newText) {
 	const blob = `${oldText || ""}\n${newText || ""}`;
-	return blob.includes("harness:begin managed") || blob.includes("harness:end managed");
+	return (
+		blob.includes("harness:begin managed") ||
+		blob.includes("harness:end managed")
+	);
 }
 
 export function editDenied(filePath, chunks) {
@@ -436,7 +477,12 @@ export function editDenied(filePath, chunks) {
 	return null;
 }
 
-export function contextStopPayload({ claude, stopHookActive, needsFollowup, message }) {
+export function contextStopPayload({
+	claude,
+	stopHookActive,
+	needsFollowup,
+	message,
+}) {
 	if (stopHookActive) return {};
 	if (!needsFollowup) return {};
 	if (claude) return { decision: "block", reason: message };
@@ -452,7 +498,13 @@ export function upkeepMessage(hits) {
 	);
 }
 
-export function sessionNotes({ branch, hooksPath, hasHusky, hasGitHooks, depsInstalled }) {
+export function sessionNotes({
+	branch,
+	hooksPath,
+	hasHusky,
+	hasGitHooks,
+	depsInstalled,
+}) {
 	const notes = [];
 	if (branch === "dev" || branch === "main") {
 		notes.push(
@@ -470,12 +522,19 @@ export function sessionNotes({ branch, hooksPath, hasHusky, hasGitHooks, depsIns
 		);
 	}
 	if (depsInstalled === false) {
-		notes.push("Dependencies are not installed. Run pnpm install before the quality gate.");
+		notes.push(
+			"Dependencies are not installed. Run pnpm install before the quality gate.",
+		);
 	}
 	return notes;
 }
 
-export function publishDecision({ publish, mobileRemindOnly, cacheHit, gateExitCode }) {
+export function publishDecision({
+	publish,
+	mobileRemindOnly,
+	cacheHit,
+	gateExitCode,
+}) {
 	if (!publish) return { action: "ignore" };
 	if (mobileRemindOnly) {
 		return {
@@ -488,7 +547,8 @@ export function publishDecision({ publish, mobileRemindOnly, cacheHit, gateExitC
 	if (gateExitCode !== 0) {
 		return {
 			action: "deny",
-			message: "The repo quality gate failed. Fix it before git push or gh pr create.",
+			message:
+				"The repo quality gate failed. Fix it before git push or gh pr create.",
 		};
 	}
 	return { action: "allow", writeCache: true };

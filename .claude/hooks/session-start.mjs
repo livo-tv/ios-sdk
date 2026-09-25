@@ -11,7 +11,11 @@ import { fileURLToPath } from "node:url";
 import { sessionNotes } from "./policy.mjs";
 
 function git(cwd, args) {
-	const r = spawnSync("git", args, { cwd, encoding: "utf8", windowsHide: true });
+	const r = spawnSync("git", args, {
+		cwd,
+		encoding: "utf8",
+		windowsHide: true,
+	});
 	if (r.status !== 0) return "";
 	return (r.stdout || "").trim();
 }
@@ -23,7 +27,8 @@ export function notesForRepo(repo) {
 	const hasHusky = existsSync(resolve(repo, ".husky"));
 	const hasGitHooks = existsSync(resolve(repo, ".githooks"));
 	const needsInstall =
-		existsSync(resolve(repo, "package.json")) && !existsSync(resolve(repo, "node_modules"));
+		existsSync(resolve(repo, "package.json")) &&
+		!existsSync(resolve(repo, "node_modules"));
 	return sessionNotes({
 		branch,
 		hooksPath,
@@ -42,7 +47,9 @@ function repos(root) {
 	return readdirSync(root, { withFileTypes: true })
 		.filter(
 			(d) =>
-				d.isDirectory() && !d.name.startsWith(".") && existsSync(resolve(root, d.name, ".git")),
+				d.isDirectory() &&
+				!d.name.startsWith(".") &&
+				existsSync(resolve(root, d.name, ".git")),
 		)
 		.map((d) => resolve(root, d.name));
 }
@@ -55,7 +62,10 @@ export function main() {
 	if (lines.length) process.stdout.write(`${lines.join("\n")}\n`);
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+if (
+	process.argv[1] &&
+	fileURLToPath(import.meta.url) === resolve(process.argv[1])
+) {
 	try {
 		main();
 	} catch {

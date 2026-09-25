@@ -54,7 +54,10 @@ export function scriptRoot() {
 function scanTargets(root) {
 	if (existsSync(join(root, ".git"))) return [{ name: "", cwd: root }];
 	return readdirSync(root, { withFileTypes: true })
-		.filter((d) => d.isDirectory() && !d.name.startsWith(".") && d.name !== "node_modules")
+		.filter(
+			(d) =>
+				d.isDirectory() && !d.name.startsWith(".") && d.name !== "node_modules",
+		)
 		.filter((d) => existsSync(join(root, d.name, ".git")))
 		.map((d) => ({ name: d.name, cwd: join(root, d.name) }));
 }
@@ -64,7 +67,10 @@ export function findUpkeepHits(root) {
 	const contextHits = [];
 	for (const target of scanTargets(root)) {
 		for (const file of gitStatus(target.cwd)) {
-			const rel = `${target.name ? `${target.name}/` : ""}${file}`.replace(/\\/g, "/");
+			const rel = `${target.name ? `${target.name}/` : ""}${file}`.replace(
+				/\\/g,
+				"/",
+			);
 			if (CONTRACT_RE.test(rel)) contractHits.push(rel);
 			if (CONTEXT_RE.test(rel)) contextHits.push(rel);
 		}
@@ -74,7 +80,9 @@ export function findUpkeepHits(root) {
 
 async function main() {
 	const input = await readStdin();
-	const claude = input.hook_event_name === "Stop" || typeof input.stop_hook_active === "boolean";
+	const claude =
+		input.hook_event_name === "Stop" ||
+		typeof input.stop_hook_active === "boolean";
 	const { contractHits, contextHits } = findUpkeepHits(scriptRoot());
 	const payload = contextStopPayload({
 		claude,
@@ -85,7 +93,10 @@ async function main() {
 	process.stdout.write(JSON.stringify(payload));
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+if (
+	process.argv[1] &&
+	fileURLToPath(import.meta.url) === resolve(process.argv[1])
+) {
 	main().catch(() => {
 		process.stdout.write("{}");
 	});
