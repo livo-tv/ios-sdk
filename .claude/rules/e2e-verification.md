@@ -1,8 +1,3 @@
----
-description: Verify user-visible and cross-service work with the matching e2e spec (or register a gap) before claiming done
-alwaysApply: true
----
-
 # E2E verification
 
 If this task changed **user-visible or cross-service** behavior, verify it

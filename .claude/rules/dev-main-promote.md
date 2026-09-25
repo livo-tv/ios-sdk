@@ -1,8 +1,3 @@
----
-description: Dev is the only path to main; fold main back into dev after every release
-alwaysApply: true
----
-
 # Dev / main promote
 
 Applies to every `livo-tv` repo that has `dev` (not `harness`).

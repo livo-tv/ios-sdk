@@ -1,8 +1,3 @@
----
-description: Never local-deploy Workers; local agents do not commit/push — cloud agents may
-alwaysApply: true
----
-
 # No local deploy; git depends on agent environment
 
 **Deploy** is owned by CI: Cloudflare Workers Builds / Modal on prod and stable

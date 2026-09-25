@@ -1,8 +1,3 @@
----
-description: Mandatory quality gates before marking work done in ios-sdk
-alwaysApply: true
----
-
 # Pre-completion checklist (ios-sdk)
 
 **CRITICAL**: Do not mark work done until the gate is green.
