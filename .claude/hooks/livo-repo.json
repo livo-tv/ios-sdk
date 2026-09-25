@@ -1,0 +1,7 @@
+{
+	"folder": "ios-sdk",
+	"class": "library",
+	"qualityGate": "./scripts/ci-check.sh",
+	"hasDev": true,
+	"mobileRemindOnly": true
+}

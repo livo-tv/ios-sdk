@@ -1,9 +1,3 @@
----
-description: Ponytail, lazy senior dev mode. Always pick the simplest solution that works.
-globs:
-alwaysApply: true
----
-
 # Ponytail, lazy senior dev mode
 
 Source: [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) (MIT, Copyright 2026 DietrichGebert). Both Cursor and Claude Code load this as an always-on rule, not a skill or `/ponytail` command.

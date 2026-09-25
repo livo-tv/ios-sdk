@@ -1,8 +1,3 @@
----
-description: Keep AGENTS.md and harness platform docs current when durable facts change
-alwaysApply: true
----
-
 # Harness context upkeep
 
 When your task changes any of the following, update context **in the same task** before claiming done:

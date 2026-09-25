@@ -1,3 +1,7 @@
+---
+description: Run the e2e spec for the area this change touched
+---
+
 # Verify e2e
 
 Runbook for `/verify-e2e` after a user-visible or cross-service change.
