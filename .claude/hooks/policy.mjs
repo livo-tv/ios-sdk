@@ -68,8 +68,21 @@ export function claudeSettings() {
 					hooks: [node("guard-edit.mjs", 20)],
 				},
 			],
+			PostToolUse: [
+				{
+					matcher: "Read|Skill",
+					hooks: [node("context-rehydrate.mjs", 10)],
+				},
+			],
+			PreCompact: [{ hooks: [node("context-rehydrate.mjs", 10)] }],
 			Stop: [{ hooks: [node("context-upkeep.mjs", 20)] }],
-			SessionStart: [{ hooks: [node("session-start.mjs", 20)] }],
+			SessionStart: [
+				{
+					matcher: "compact",
+					hooks: [node("context-rehydrate.mjs", 10)],
+				},
+				{ hooks: [node("session-start.mjs", 20)] },
+			],
 		},
 	};
 }
@@ -572,4 +585,129 @@ export function commandWorkdir(cwd, command) {
 	if (target.startsWith("/")) return target;
 	const base = cwd || ".";
 	return `${base.replace(/\/$/, "")}/${target}`;
+}
+
+/** Re-injected after summarization. Rules files are already always-on. */
+export const HARD_RULES_DIGEST = [
+	"Never local-deploy (wrangler deploy, preview:upload, modal deploy). Local agents do not commit or push unless asked.",
+	"Product PRs target dev; harness stays on main. Fold main back into dev after a release (ADR 0026).",
+	"Do not hand-bump versions; release.yml owns them.",
+	"Engineering language is English (ADR 0028).",
+	"Run the touched repo's full quality gate before claiming done.",
+	"User-visible or cross-service work needs e2e/COVERAGE.md and pnpm test:prod:verify. Never run @live-media unless asked.",
+	"Update harness context in the same task when contracts, bindings, or durable facts change.",
+	"List filters are server-side (q/query, cursor). Confirm before destructive UI actions.",
+];
+
+const TRACKED_CONTEXT =
+	/(?:^|\/)SKILL\.md$|(?:^|\/)commands\/[^/]+\.md$|harness\/platform\/|\.mdc$/;
+
+export function isTrackedContextPath(filePath) {
+	if (typeof filePath !== "string" || !filePath) return false;
+	return TRACKED_CONTEXT.test(filePath.replace(/\\/g, "/"));
+}
+
+export function toolInputPath(input) {
+	const sources = [input?.tool_input, input];
+	for (const source of sources) {
+		if (!source || typeof source !== "object") continue;
+		for (const key of ["path", "file_path", "target_file"]) {
+			if (typeof source[key] === "string" && source[key]) return source[key];
+		}
+	}
+	return "";
+}
+
+export function rehydrateMessage(reads) {
+	const seen = new Set();
+	const newest = [];
+	const list = Array.isArray(reads) ? reads : [];
+	for (let i = list.length - 1; i >= 0; i--) {
+		const path = String(list[i]).replace(/\\/g, "/");
+		if (seen.has(path)) continue;
+		seen.add(path);
+		newest.push(path);
+		if (newest.length === 15) break;
+	}
+	const lines = [
+		"Context was summarized. These rules still apply:",
+		...HARD_RULES_DIGEST.map((rule) => `- ${rule}`),
+	];
+	if (newest.length) {
+		lines.push(
+			"",
+			"Re-read these files before continuing; their contents were compressed:",
+			...newest.map((path) => `- ${path}`),
+		);
+	}
+	return lines.join("\n");
+}
+
+function claudeHookEvent(name) {
+	return (
+		name === "PostToolUse" || name === "SessionStart" || name === "PreCompact"
+	);
+}
+
+/**
+ * Pure state step for the rehydrate hook.
+ * ponytail: keep the last 40 reads in memory; the message shows 15.
+ * Upgrade path: persist a per-path mtime if chats outlive that window.
+ */
+export function rehydrateStep(state, input) {
+	const reads = Array.isArray(state?.reads) ? state.reads.slice() : [];
+	let compacted = Boolean(state?.compacted);
+	const event = String(input?.hook_event_name || "");
+	const claude = claudeHookEvent(event);
+
+	if (event === "preCompact" || event === "PreCompact") {
+		return { state: { reads, compacted: true }, output: {} };
+	}
+
+	if (event === "postToolUse" || event === "PostToolUse") {
+		const path = toolInputPath(input);
+		if (isTrackedContextPath(path)) {
+			reads.push(path);
+			if (reads.length > 40) reads.splice(0, reads.length - 40);
+		}
+		if (!compacted) return { state: { reads, compacted }, output: {} };
+		const message = rehydrateMessage(reads);
+		const output = claude
+			? {
+					hookSpecificOutput: {
+						hookEventName: "PostToolUse",
+						additionalContext: message,
+					},
+				}
+			: { additional_context: message };
+		return { state: { reads, compacted: false }, output };
+	}
+
+	if (event === "SessionStart" && input?.source === "compact") {
+		return {
+			state: { reads, compacted: false },
+			output: {
+				hookSpecificOutput: {
+					hookEventName: "SessionStart",
+					additionalContext: rehydrateMessage(reads),
+				},
+			},
+		};
+	}
+
+	return { state: { reads, compacted }, output: {} };
+}
+
+export function compactionRow(input) {
+	return {
+		ts: new Date().toISOString(),
+		conversation_id: input?.conversation_id ?? input?.session_id ?? null,
+		trigger: input?.trigger ?? null,
+		context_tokens: input?.context_tokens ?? null,
+		context_usage_percent: input?.context_usage_percent ?? null,
+		context_window_size: input?.context_window_size ?? null,
+		messages_to_compact: input?.messages_to_compact ?? null,
+		is_first_compaction: input?.is_first_compaction ?? null,
+		model: input?.model ?? null,
+	};
 }

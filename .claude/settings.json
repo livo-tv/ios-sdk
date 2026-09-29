@@ -49,6 +49,29 @@
 				]
 			}
 		],
+		"PostToolUse": [
+			{
+				"matcher": "Read|Skill",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/context-rehydrate.mjs\"",
+						"timeout": 10
+					}
+				]
+			}
+		],
+		"PreCompact": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/context-rehydrate.mjs\"",
+						"timeout": 10
+					}
+				]
+			}
+		],
 		"Stop": [
 			{
 				"hooks": [
@@ -61,6 +84,16 @@
 			}
 		],
 		"SessionStart": [
+			{
+				"matcher": "compact",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/context-rehydrate.mjs\"",
+						"timeout": 10
+					}
+				]
+			},
 			{
 				"hooks": [
 					{
